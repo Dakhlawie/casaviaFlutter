@@ -1,19 +1,34 @@
+import 'package:casavia/model/user.dart';
 import 'package:casavia/theme/styles.dart';
 import 'package:casavia/widgets/card_info_widget.dart';
 import 'package:casavia/widgets/payment_info_item.dart';
 import 'package:casavia/widgets/total_price_widget.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/svg.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:intl/intl.dart';
 
+class ThankYouCard extends StatefulWidget {
+  final User user;
+  final double total;
+  final String currency;
 
-class ThankYouCard extends StatelessWidget {
   const ThankYouCard({
     super.key,
+    required this.user,
+    required this.total,
+    required this.currency,
   });
 
   @override
+  _ThankYouCardState createState() => _ThankYouCardState();
+}
+
+class _ThankYouCardState extends State<ThankYouCard> {
+  @override
   Widget build(BuildContext context) {
+    final DateTime now = DateTime.now();
+    final String formattedDate = DateFormat('dd/MM/yyyy').format(now);
+    final String formattedTime = DateFormat('hh:mm a').format(now);
     return Container(
       width: double.infinity,
       decoration: ShapeDecoration(
@@ -39,33 +54,34 @@ class ThankYouCard extends StatelessWidget {
             const SizedBox(
               height: 42,
             ),
-            const PaymentItemInfo(
+            PaymentItemInfo(
               title: 'Date',
-              value: '01/24/2023',
+              value: formattedDate,
             ),
             const SizedBox(
-              height: 20,
+              height: 40,
             ),
-            const PaymentItemInfo(
+            PaymentItemInfo(
               title: 'Time',
-              value: '10:15 AM',
+              value: formattedTime,
             ),
             const SizedBox(
-              height: 20,
+              height: 40,
             ),
-            const PaymentItemInfo(
-              title: 'To',
-              value: 'Dakhlawie Meryem',
+            PaymentItemInfo(
+              title: 'By',
+              value: '${widget.user.nom} ${widget.user.prenom}',
             ),
             const Divider(
               height: 60,
               thickness: 2,
             ),
-            const TotalPrice(title: 'Total', value: r'$50.97'),
+            TotalPrice(
+                title: 'Total', value: '${widget.currency} ${widget.total}'),
             const SizedBox(
               height: 30,
             ),
-            const CardInfoWidget(),
+            // const CardInfoWidget(),
             const Spacer(),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -84,7 +100,7 @@ class ThankYouCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(15),
                     ),
                   ),
-                  child: Center(
+                  child: const Center(
                     child: Text(
                       'PAID',
                       textAlign: TextAlign.center,

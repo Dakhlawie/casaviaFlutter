@@ -13,10 +13,9 @@ class UserModel with ChangeNotifier {
     _userId = userId;
     notifyListeners();
     if (userId == 0) {
-  
-    print("Invalid userId provided: 0");
-    return;
-  }
+      print("Invalid userId provided: 0");
+      return;
+    }
     userPreferredHebergements = await fetchUserPreferredHebergements(userId);
     List<Hebergement> recommendedHebergements = await recommandationService
         .getRecommendedHebergements(userPreferredHebergements, userId);

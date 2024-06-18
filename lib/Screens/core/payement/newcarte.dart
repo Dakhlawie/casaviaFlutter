@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
+import 'package:http/http.dart' as http;
 
 class NewCartePage extends StatefulWidget {
   const NewCartePage({Key? key}) : super(key: key);
@@ -10,7 +13,9 @@ class NewCartePage extends StatefulWidget {
 
 class _NewCartePageState extends State<NewCartePage> {
   DateTime _selectedDate = DateTime.now();
-
+  final TextEditingController _cardholderController = TextEditingController();
+  final TextEditingController _cardNumberController = TextEditingController();
+  final TextEditingController _cvcController = TextEditingController();
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? pickedDate = await showDatePicker(
       context: context,
@@ -32,6 +37,104 @@ class _NewCartePageState extends State<NewCartePage> {
       setState(() {
         _selectedDate = pickedDate;
       });
+    }
+  }
+
+  String _cardTypeFromNumber(String cardNumber) {
+    // Simple logic to determine card type from card number
+    if (cardNumber.startsWith(RegExp(r'4'))) {
+      return 'visa';
+    } else if (cardNumber.startsWith(RegExp(r'5[1-5]'))) {
+      return 'mastercard';
+    } else if (cardNumber.startsWith(RegExp(r'3[47]'))) {
+      return 'amex';
+    } else {
+      return 'unknown';
+    }
+  }
+
+  Future<void> _makePayment() async {
+    final String apiUrl = 'http://192.168.1.17:3000/api/paypal/pay';
+    final double total = 100.0;
+    final String currency = 'USD';
+    final String method = 'paypal';
+    final String intent = 'sale';
+    final String description = 'Description of payment';
+    final String cancelUrl = 'https://www.facebook.com/';
+    final String successUrl = 'https://www.instagram.com/';
+
+    final response = await http.post(
+      Uri.parse(apiUrl),
+      headers: <String, String>{
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: {
+        'total': total.toString(),
+        'currency': currency,
+        'method': method,
+        'intent': intent,
+        'description': description,
+        'cancelUrl': cancelUrl,
+        'successUrl': successUrl,
+      },
+    );
+    Future<void> refundPayment(
+        String saleId, double amount, String currency) async {
+      final String apiUrl = 'http://192.168.1.17:3000/api/paypal/refund';
+
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: <String, String>{
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: {
+          'saleId': saleId,
+          'amount': "20",
+          'currency': "USD",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> refundData = json.decode(response.body);
+        print('Refund successful: $refundData');
+      } else {
+        print('Refund failed: ${response.reasonPhrase}');
+      }
+    }
+
+    print(response.statusCode);
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> paymentData = json.decode(response.body);
+      print(response.body);
+    } else {
+      print('Error: ${response.reasonPhrase}');
+    }
+  }
+
+  final String baseUrl = "http://192.168.1.17:3000/api/stripe";
+  Future<Map<String, dynamic>> createCharge() async {
+    final url = Uri.parse('$baseUrl/charge');
+
+    final headers = {'Content-Type': 'application/json'};
+    final body = jsonEncode({
+      'number': '4242424242424242',
+      'expMonth': 02,
+      'expYear': 2025,
+      'cvc': '424',
+      'amount': 300,
+      'currency': 'usd'
+    });
+
+    try {
+      final response = await http.post(url, headers: headers, body: body);
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        print('hey');
+        return {'error': jsonDecode(response.body)['message']};
+      }
+    } catch (e) {
+      return {'error': e.toString()};
     }
   }
 
@@ -76,6 +179,7 @@ class _NewCartePageState extends State<NewCartePage> {
                     ),
                     SizedBox(height: 8),
                     TextFormField(
+                      controller: _cardholderController,
                       decoration: InputDecoration(
                         hintText: 'Dakhlawie Meryem',
                         prefixIcon: Icon(Icons.person, color: Colors.blue[900]),
@@ -105,6 +209,7 @@ class _NewCartePageState extends State<NewCartePage> {
                     ),
                     SizedBox(height: 8),
                     TextFormField(
+                      controller: _cardNumberController,
                       decoration: InputDecoration(
                         hintText: '1234 5678 9012 3456',
                         prefixIcon:
@@ -142,23 +247,16 @@ class _NewCartePageState extends State<NewCartePage> {
                                 ),
                               ),
                               SizedBox(height: 8),
-                              GestureDetector(
-                                onTap: () {
-                                  _selectDate(context);
-                                },
-                                child: AbsorbPointer(
-                                  child: TextFormField(
-                                    decoration: InputDecoration(
-                                      hintText: 'MM/YY',
-                                      prefixIcon: Icon(Icons.calendar_today,
-                                          color: Colors.blue[900]),
-                                      border: OutlineInputBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(10.0),
-                                        borderSide: BorderSide(
-                                          color: Colors.blue[900]!,
-                                        ),
-                                      ),
+                              TextFormField(
+                                decoration: InputDecoration(
+                                  hintText: 'MM/YY',
+                                  prefixIcon: Icon(Icons.calendar_today,
+                                      color: Colors.blue[900]),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10.0),
+                                    borderSide: BorderSide(
+                                      color: const Color.fromARGB(
+                                          255, 66, 75, 90)!,
                                     ),
                                   ),
                                 ),
@@ -190,6 +288,7 @@ class _NewCartePageState extends State<NewCartePage> {
                               ),
                               SizedBox(height: 8),
                               TextFormField(
+                                controller: _cvcController,
                                 decoration: InputDecoration(
                                   hintText: '123',
                                   prefixIcon: Icon(Icons.credit_card,
@@ -213,7 +312,9 @@ class _NewCartePageState extends State<NewCartePage> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () {},
+                        onPressed: () async {
+                          createCharge();
+                        },
                         child: Text(
                           'Use this Card',
                           style: TextStyle(color: Colors.white),

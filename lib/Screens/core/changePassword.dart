@@ -1,3 +1,4 @@
+import 'package:another_flushbar/flushbar.dart';
 import 'package:casavia/Screens/core/security.dart';
 import 'package:casavia/Screens/login/forget_password.dart';
 import 'package:casavia/services/AuthService.dart';
@@ -30,6 +31,15 @@ class _ChangePasswordState extends State<ChangePassword> {
 
   bool _containsLetterAndNumber(String text) {
     return RegExp(r'^(?=.*[a-zA-Z])(?=.*\d)').hasMatch(text);
+  }
+
+  void showFlushbar(BuildContext context, String message, Color color) {
+    Flushbar(
+      message: message,
+      backgroundColor: color,
+      duration: Duration(seconds: 3),
+      flushbarPosition: FlushbarPosition.TOP,
+    ).show(context);
   }
 
   bool _obscureCurrentPassword = true;
@@ -80,7 +90,10 @@ class _ChangePasswordState extends State<ChangePassword> {
                       Text(
                         'Change password',
                         style: TextStyle(
-                            fontSize: 20, fontWeight: FontWeight.bold),
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'AbrilFatface',
+                        ),
                       ),
                       SizedBox(height: 20),
                       Text(
@@ -220,39 +233,36 @@ class _ChangePasswordState extends State<ChangePassword> {
                       if (_currentPasswordController.text.isEmpty ||
                           _newPasswordController.text.isEmpty ||
                           _retypeNewPasswordController.text.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Please fill in all fields',
-                                style: TextStyle(color: Colors.white)),
-                            duration: Duration(seconds: 2),
-                            backgroundColor: Colors.red,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
+                        Flushbar(
+                          message: 'Please fill in all fields',
+                          backgroundColor: Colors.red,
+                          duration: Duration(seconds: 2),
+                          flushbarPosition: FlushbarPosition.TOP,
+                        ).show(context);
                       } else if (_newPasswordController.text !=
                           _retypeNewPasswordController.text) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('passwords do not much',
-                                style: TextStyle(color: Colors.white)),
-                            duration: Duration(seconds: 2),
-                            backgroundColor: Colors.red,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
+                        Flushbar(
+                          message: 'Passwords do not match',
+                          backgroundColor: Colors.red,
+                          duration: Duration(seconds: 2),
+                          flushbarPosition: FlushbarPosition.TOP,
+                        ).show(context);
                       } else if (_newPasswordController.text.length < 8 ||
                           !_containsLetterAndNumber(
                               _newPasswordController.text)) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                                'Password must be at least 8 characters long and contain both letters and numbers',
-                                style: TextStyle(color: Colors.white)),
-                            duration: Duration(seconds: 2),
-                            backgroundColor: Colors.red,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
+                        Flushbar(
+                          message:
+                              'Password must be at least 8 characters long and contain both letters and numbers',
+                          backgroundColor: Colors.red,
+                          duration: Duration(seconds: 2),
+                          flushbarPosition: FlushbarPosition.TOP,
+                        ).show(context);
+                      } else if (_newPasswordController.text ==
+                          _currentPasswordController.text) {
+                        showFlushbar(
+                            context,
+                            'New password cannot be the same as the current password',
+                            Colors.red);
                       } else {
                         bool success = await _userService.changePassword(
                           userId,
@@ -260,25 +270,19 @@ class _ChangePasswordState extends State<ChangePassword> {
                           _newPasswordController.text,
                         );
                         if (success) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Password changed successfully',
-                                  style: TextStyle(color: Colors.white)),
-                              backgroundColor: Colors.green,
-                              duration: Duration(seconds: 2),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
+                          Flushbar(
+                            message: 'Password changed successfully',
+                            backgroundColor: Colors.green,
+                            duration: Duration(seconds: 2),
+                            flushbarPosition: FlushbarPosition.TOP,
+                          ).show(context);
                         } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Incorrect current password',
-                                  style: TextStyle(color: Colors.white)),
-                              duration: Duration(seconds: 2),
-                              backgroundColor: Colors.red,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
+                          Flushbar(
+                            message: 'Incorrect current password',
+                            backgroundColor: Colors.red,
+                            duration: Duration(seconds: 2),
+                            flushbarPosition: FlushbarPosition.TOP,
+                          ).show(context);
                         }
                       }
                     },

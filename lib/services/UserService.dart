@@ -4,6 +4,16 @@ import 'package:casavia/model/user.dart';
 import 'package:http/http.dart' as http;
 
 class UserService {
+  Future<void> supprimerUser(int id) async {
+    final String baseUrl = 'http://192.168.1.17:3000/user';
+    final url = Uri.parse('$baseUrl/delete/$id');
+    final response = await http.delete(url);
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to delete user');
+    }
+  }
+
   Future<Uint8List?> getImageFromFS(int id) async {
     final String url = 'http://192.168.1.17:3000/api/image/loadfromFS/$id';
     try {
@@ -129,6 +139,25 @@ class UserService {
         Uri.parse(url),
         headers: {"Content-Type": "application/json"},
         body: phone,
+      );
+      if (response.statusCode == 200) {
+        return User.fromJson(jsonDecode(response.body));
+      } else {
+        throw Exception(
+            'Erreur lors de la modification du phone: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Erreur lors de la modification du phone: $e');
+    }
+  }
+
+  Future<User> modifierUserFlag(int id, String flag) async {
+    final String url = 'http://192.168.1.17:3000/user/updateflag/$id';
+    try {
+      final response = await http.put(
+        Uri.parse(url),
+        headers: {"Content-Type": "application/json"},
+        body: flag,
       );
       if (response.statusCode == 200) {
         return User.fromJson(jsonDecode(response.body));

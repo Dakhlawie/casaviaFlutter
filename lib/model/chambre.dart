@@ -1,5 +1,3 @@
-
-
 import 'package:casavia/model/equipement.dart';
 
 class Chambre {
@@ -8,7 +6,10 @@ class Chambre {
   String description;
   double prix;
   String image_path;
-  List<Equipement> equipements;
+  List<Equipement>? equipements;
+  String? floor;
+  String? view;
+  String? bed;
 
   Chambre({
     required this.chambreId,
@@ -16,13 +17,19 @@ class Chambre {
     required this.description,
     required this.prix,
     required this.image_path,
-    required this.equipements,
+    this.equipements,
+    this.floor,
+    this.view,
+    this.bed,
   });
 
   factory Chambre.fromJson(Map<String, dynamic> json) {
-    List<dynamic> equipementsJson = json['equipements'];
-    List<Equipement> equipements =
-        equipementsJson.map((e) => Equipement.fromJson(e)).toList();
+    List<dynamic>? jsonEquipements = json['equipements'];
+    List<Equipement>? equipements = jsonEquipements != null
+        ? jsonEquipements
+            .map((equipementJson) => Equipement.fromJson(equipementJson))
+            .toList()
+        : null;
 
     return Chambre(
       chambreId: json['chambre_id'],
@@ -31,6 +38,9 @@ class Chambre {
       prix: json['prix'].toDouble(),
       image_path: json['image_path'],
       equipements: equipements,
+      floor: json['floor'],
+      view: json['view'],
+      bed: json['bed'],
     );
   }
 
@@ -40,6 +50,10 @@ class Chambre {
         'description': description,
         'prix': prix,
         'image_path': image_path,
-        'equipements': equipements.map((e) => e.toJson()).toList(),
+        'equipements':
+            equipements?.map((equipement) => equipement.toJson()).toList(),
+        'floor': floor,
+        'view': view,
+        'bed': bed,
       };
 }

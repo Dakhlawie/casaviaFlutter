@@ -9,6 +9,7 @@ class User {
   String email;
   String motDePasse;
   String? imagePath;
+  String flag;
 
   User({
     required this.id,
@@ -19,6 +20,7 @@ class User {
     required this.email,
     required this.motDePasse,
     this.imagePath,
+    required this.flag,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -32,6 +34,7 @@ class User {
       email: json['email'],
       motDePasse: json['mot_de_passe'],
       imagePath: json['image_path'],
+      flag: json['flag'],
     );
     print(user);
     return user;
@@ -46,5 +49,6 @@ class User {
         'email': email,
         'mot_de_passe': motDePasse,
         'image_path': imagePath,
+        'flag': flag,
       };
 }

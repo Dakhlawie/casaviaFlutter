@@ -1,5 +1,7 @@
+import 'package:another_flushbar/flushbar.dart';
 import 'package:casavia/Screens/login/infos.dart';
 import 'package:casavia/Screens/login/login_page.dart';
+import 'package:casavia/Screens/login/signUp.dart';
 import 'package:casavia/model/user.dart';
 import 'package:casavia/services/UserService.dart';
 import 'package:flutter/cupertino.dart';
@@ -15,15 +17,13 @@ class ForgetPasswordPage extends StatefulWidget {
 }
 
 class _ForgetPasswordPageState extends State<ForgetPasswordPage> {
-  void showSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message, style: TextStyle(color: Colors.white)),
-        duration: Duration(seconds: 2),
-        backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+  void showFlushbar(BuildContext context, String message, Color color) {
+    Flushbar(
+      message: message,
+      backgroundColor: color,
+      duration: Duration(seconds: 3),
+      flushbarPosition: FlushbarPosition.TOP,
+    ).show(context);
   }
 
   UserService userService = UserService();
@@ -144,11 +144,17 @@ class _ForgetPasswordPageState extends State<ForgetPasswordPage> {
                                 context: context,
                                 builder: (BuildContext context) {
                                   return AlertDialog(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.all(Radius.circular(10)),
+                                    ),
                                     title: Center(
                                       child: Text(
                                           'We couldn\'t find your account.',
                                           style: TextStyle(
-                                              fontWeight: FontWeight.bold)),
+                                            fontWeight: FontWeight.bold,
+                                            fontFamily: 'AbrilFatface',
+                                          )),
                                     ),
                                     content: Column(
                                       mainAxisSize: MainAxisSize.min,
@@ -168,11 +174,19 @@ class _ForgetPasswordPageState extends State<ForgetPasswordPage> {
                                                     context,
                                                     MaterialPageRoute(
                                                       builder: (context) =>
-                                                          UserInformation(),
+                                                          SignUpPage(),
                                                     ),
                                                   );
                                                 },
                                                 style: ButtonStyle(
+                                                  shape:
+                                                      MaterialStateProperty.all(
+                                                    RoundedRectangleBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              10),
+                                                    ),
+                                                  ),
                                                   backgroundColor:
                                                       MaterialStateProperty.all(
                                                           Colors.blue[900]),
@@ -198,6 +212,14 @@ class _ForgetPasswordPageState extends State<ForgetPasswordPage> {
                                                   ); // Ferme la boîte de dialogue
                                                 },
                                                 style: ButtonStyle(
+                                                  shape:
+                                                      MaterialStateProperty.all(
+                                                    RoundedRectangleBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              10),
+                                                    ),
+                                                  ),
                                                   backgroundColor:
                                                       MaterialStateProperty.all(
                                                           Colors.blue[900]),
@@ -217,7 +239,8 @@ class _ForgetPasswordPageState extends State<ForgetPasswordPage> {
                               );
                             }
                           } else {
-                            showSnackBar(context, 'Please fill in all fields.');
+                            showFlushbar(context, 'Please fill in your email.',
+                                Colors.red);
                           }
                         },
                         style: ElevatedButton.styleFrom(

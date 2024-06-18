@@ -1,10 +1,13 @@
 import 'dart:async';
 
 import 'package:casavia/Screens/core/GeneralSettings.dart';
+import 'package:casavia/Screens/core/Reviews.dart';
 import 'package:casavia/Screens/core/accountSettings.dart';
 import 'package:casavia/Screens/core/booking.dart';
 import 'package:casavia/Screens/core/favorite.dart';
+import 'package:casavia/Screens/core/help.dart';
 import 'package:casavia/Screens/login/login_page.dart';
+import 'package:casavia/model/user.dart';
 import 'package:casavia/model/userModel.dart';
 import 'package:casavia/services/AuthService.dart';
 import 'package:casavia/services/UserService.dart';
@@ -26,12 +29,19 @@ class SettingPage extends StatefulWidget {
 class _SettingPageState extends State<SettingPage> {
   late final AuthService _authService;
   late final UserService _userService;
-
+  Future<bool>? isLoggedInFuture;
   @override
   void initState() {
     super.initState();
     _authService = AuthService();
     _userService = UserService();
+    _loadData();
+  }
+
+  void _loadData() {
+    setState(() {
+      isLoggedInFuture = _authService.isLoggedIn();
+    });
   }
 
   int userId = 0;
@@ -113,14 +123,13 @@ class _SettingPageState extends State<SettingPage> {
                   ),
                   const SizedBox(height: 10),
                   SettingItem(
-                    title: "Bookings",
+                    title: "Help",
                     leadingIcon: Icons.bookmark_border,
                     leadingIconColor: Colors.blue[900],
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(
-                            builder: (context) => BookingScreen()),
+                        MaterialPageRoute(builder: (context) => HelpPage()),
                       );
                     },
                   ),
@@ -134,8 +143,20 @@ class _SettingPageState extends State<SettingPage> {
                         context,
                         MaterialPageRoute(
                             builder: (context) => FavoritePage(
-                                  userId: this.userId,
+                                  userId: this.userId ?? 0,
                                 )),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  SettingItem(
+                    title: "Reviews",
+                    leadingIcon: Icons.star,
+                    leadingIconColor: Colors.blue[900],
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => ReviewsPage()),
                       );
                     },
                   ),
@@ -169,49 +190,101 @@ class _SettingPageState extends State<SettingPage> {
     return FutureBuilder<Map<String, dynamic>?>(
       future: _authService.getUserDetails(),
       builder: (context, snapshot) {
-        print('hhh');
-        print(snapshot.hasData);
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
           return Center(child: Text("Erreur lors du chargement des données."));
         } else if (snapshot.hasData) {
-          Map<String, dynamic>? userData = snapshot.data!['data'];
+          Map<String, dynamic>? userData = snapshot.data?['data'];
+          int userId = userData?['user_id'] ?? 0;
 
-          String username = userData?['nom'] ?? '';
-          userId = userData?['user_id'] ?? 0;
+          return FutureBuilder<User?>(
+            future: UserService().getUserById(userId),
+            builder: (context, userSnapshot) {
+              if (userSnapshot.connectionState == ConnectionState.waiting) {
+                return Center(child: CircularProgressIndicator());
+              } else if (userSnapshot.hasError) {
+                return Center(
+                    child: Text("Erreur lors du chargement des données."));
+              } else if (userSnapshot.hasData) {
+                User? userDetails = userSnapshot.data;
+                String username = userDetails?.nom ?? '';
 
-          return Padding(
-            padding: EdgeInsets.only(left: 20),
-            child: Column(
-              children: [
-                ClipOval(
-                  child: Image.network(
-                    'http://192.168.1.17:3000/api/image/loadfromFS/$userId',
-                    width: 100,
-                    height: 100,
-                    fit: BoxFit.cover,
+                return Padding(
+                  padding: EdgeInsets.only(left: 20),
+                  child: Column(
+                    children: [
+                      ClipOval(
+                        child: Image.network(
+                          'http://192.168.1.17:3000/api/image/loadfromFS/$userId',
+                          width: 100,
+                          height: 100,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      const SizedBox(
+                        height: 12,
+                      ),
+                      Text(
+                        username,
+                        style: TextStyle(
+                          color: AppColor.textColor,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(
+                        height: 5,
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(
-                  height: 12,
-                ),
-                Text(
-                  username,
-                  style: TextStyle(
-                    color: AppColor.textColor,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w500,
+                );
+              } else {
+                return Padding(
+                  padding: EdgeInsets.only(left: 20),
+                  child: Column(
+                    children: [
+                      ClipOval(
+                        child: Image.asset(
+                          'assets/admin.png',
+                          width: 100,
+                          height: 100,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      const SizedBox(
+                        height: 12,
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.blue[900],
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) => LoginPage()),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue[900],
+                            padding: EdgeInsets.symmetric(
+                                vertical: 10, horizontal: 50),
+                          ),
+                          child: Text('Login',
+                              style: TextStyle(color: Colors.white)),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(
-                  height: 5,
-                ),
-              ],
-            ),
+                );
+              }
+            },
           );
         } else {
-          print('hello');
           return Padding(
             padding: EdgeInsets.only(left: 20),
             child: Column(

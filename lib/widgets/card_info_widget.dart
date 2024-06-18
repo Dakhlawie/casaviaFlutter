@@ -19,7 +19,8 @@ class CardInfoWidget extends StatelessWidget {
       ),
       child: Row(
         children: [
-          SvgPicture.asset('assets/master_card.svg'),
+          //SvgPicture.asset('assets/master_card.svg'),
+         SvgPicture.asset('assets/paypal.svg', height: 100, width: 100),
           const SizedBox(
             width: 23,
           ),

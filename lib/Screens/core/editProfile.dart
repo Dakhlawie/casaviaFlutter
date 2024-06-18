@@ -1,3 +1,4 @@
+import 'package:another_flushbar/flushbar.dart';
 import 'package:casavia/model/userData.dart';
 import 'package:casavia/services/UserService.dart';
 import 'package:country_flags/country_flags.dart';
@@ -11,19 +12,31 @@ class EditProfilePage extends StatefulWidget {
   final String country;
   final String phone;
   final int id;
+  final String emoji;
   const EditProfilePage(
       {super.key,
       required this.id,
       required this.firstname,
       required this.lastname,
       required this.phone,
-      required this.country});
+      required this.country,
+      required this.emoji});
 
   @override
   State<EditProfilePage> createState() => _EditProfilePageState();
 }
 
 class _EditProfilePageState extends State<EditProfilePage> {
+  String? flagEmoji = "🇹🇳";
+  void showFlushbar(BuildContext context, String message, Color color) {
+    Flushbar(
+      message: message,
+      backgroundColor: color,
+      duration: Duration(seconds: 3),
+      flushbarPosition: FlushbarPosition.TOP,
+    ).show(context);
+  }
+
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
@@ -43,11 +56,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
   @override
   void initState() {
     super.initState();
+    setState(() {});
     _firstNameController.text = widget.firstname ?? '';
     _lastNameController.text = widget.lastname ?? '';
     _phoneController.text = widget.phone ?? '';
-    _countryController.text = widget.country ?? '';
-    selectedCountryCode = '+216';
+    final phoneInfo = _extractPhoneInfo(widget.phone);
+    selectedCountryCode = phoneInfo['countryCode'];
+    _phoneController.text = phoneInfo['phoneNumber']!;
+    this.flagEmoji = widget.emoji!;
   }
 
   String extractCountryCode(String countryName) {
@@ -57,6 +73,22 @@ class _EditProfilePageState extends State<EditProfilePage> {
       return match.group(1)!;
     } else {
       return '';
+    }
+  }
+
+  Map<String, String> _extractPhoneInfo(String phone) {
+    RegExp regex = RegExp(r'\(\+(\d+)\)(\d+)');
+    Match? match = regex.firstMatch(phone);
+    if (match != null) {
+      return {
+        'countryCode': match.group(1)!,
+        'phoneNumber': match.group(2)!,
+      };
+    } else {
+      return {
+        'countryCode': '',
+        'phoneNumber': '',
+      };
     }
   }
 
@@ -89,75 +121,46 @@ class _EditProfilePageState extends State<EditProfilePage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'First Name',
+                  'Update Account',
                   style: TextStyle(
+                    fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    fontSize: 18,
+                    fontFamily: 'AbrilFatface',
                   ),
                 ),
-                SizedBox(height: 16),
-                Theme(
-                  data: ThemeData(
-                    textSelectionTheme: TextSelectionThemeData(
-                      cursorColor: Colors.blue[900],
-                      selectionColor: Colors.blue.withOpacity(0.5),
-                      selectionHandleColor: Colors.blue[900],
+                SizedBox(height: 30),
+                TextField(
+                  controller: _firstNameController,
+                  decoration: InputDecoration(
+                    hintText: 'first name',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                  ),
-                  child: TextField(
-                    controller: _firstNameController,
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.grey),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.blue[900]!),
-                      ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: Colors.blue[900]!),
                     ),
                   ),
                 ),
-                SizedBox(height: 10),
-                Text(
-                  'Last Name',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-                SizedBox(height: 16),
-                Theme(
-                  data: ThemeData(
-                    textSelectionTheme: TextSelectionThemeData(
-                      cursorColor: Colors.blue[900],
-                      selectionColor: Colors.blue.withOpacity(0.5),
-                      selectionHandleColor: Colors.blue[900],
+                SizedBox(height: 20),
+                TextField(
+                  controller: _lastNameController,
+                  decoration: InputDecoration(
+                    hintText: 'last name',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                  ),
-                  child: TextField(
-                    controller: _lastNameController,
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.grey),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.blue[900]!),
-                      ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: Colors.blue[900]!),
                     ),
                   ),
                 ),
-                SizedBox(height: 10),
-                Text(
-                  'Phone',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-                SizedBox(height: 16),
+                SizedBox(height: 20),
                 Row(
                   children: [
                     Expanded(
-                      child: TextFormField(
+                      child: TextField(
                         readOnly: true,
                         onTap: () {
                           showCountryPicker(
@@ -170,6 +173,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                 this.selectedCountryCode = country.phoneCode;
                                 this.selectedCountryName =
                                     extractCountryCode(country.displayName);
+                                this.flagEmoji = country.flagEmoji;
                               });
                               print(selectedCountryName);
                             },
@@ -197,85 +201,50 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           );
                         },
                         decoration: InputDecoration(
+                          hintText:
+                              "\+$selectedCountryCode" ?? 'Select Country',
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(5),
-                            borderSide: BorderSide(color: Colors.grey),
+                            borderRadius: BorderRadius.circular(10),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(5),
                             borderSide: BorderSide(
-                              color: Colors.blue[900]!,
-                            ),
+                                color: Colors.blue[900]!, width: 1.0),
+                            borderRadius:
+                                BorderRadius.all(Radius.circular(10.0)),
                           ),
                           prefixIcon: Padding(
-                              padding: EdgeInsets.only(right: 10.0),
-                              child: countryIcon(selectedCountryName!)),
+                            padding: EdgeInsets.all(5.0),
+                            child: CircleAvatar(
+                              radius: 20,
+                              backgroundColor: Colors.transparent,
+                              child: Text(flagEmoji!),
+                            ),
+                          ),
                           suffixIcon: Icon(Icons.arrow_drop_down),
                         ),
                       ),
                     ),
                     SizedBox(width: 16),
                     Expanded(
-                      flex: 2,
-                      child: TextFormField(
-                        onChanged: (value) {
-                          bool isNumeric = RegExp(r'^[0-9]+$').hasMatch(value);
-                          setState(() {
-                            isPhoneNumberFilled = value.isNotEmpty && isNumeric;
-                          });
-                          setState(() {
-                            if (_phoneController.text.isEmpty) {
-                              _phoneerror = "This field cannot be empty";
-                            } else {
-                              _phoneerror = "";
-                            }
-                          });
-                        },
-                        onTap: () {
-                          setState(() {
-                            if (_phoneController.text.isEmpty) {
-                              _phoneerror = "This field cannot be empty";
-                            } else {
-                              _phoneerror = "";
-                            }
-                          });
-                        },
+                      child: TextField(
                         controller: _phoneController,
                         decoration: InputDecoration(
-                          hintText: "Enter your phone ",
+                          hintText: "Phone ",
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(5),
+                            borderRadius: BorderRadius.circular(10),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(5),
                             borderSide: BorderSide(
-                              color: Colors.blue[900]!,
-                            ),
-                          ),
-                          prefix: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: <Widget>[
-                              Text("$selectedCountryCode" ?? 'Select Country'),
-                              Container(
-                                height: 20,
-                                child: VerticalDivider(color: Colors.grey),
-                              ),
-                            ],
+                                color: Colors.blue[900]!, width: 1.0),
+                            borderRadius:
+                                BorderRadius.all(Radius.circular(10.0)),
                           ),
                         ),
                       ),
                     ),
                   ],
                 ),
-                SizedBox(height: 10),
-                Text(
-                  'Country',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-                SizedBox(height: 16),
+                SizedBox(height: 20),
                 GestureDetector(
                   onTap: () {
                     showCountryPicker(
@@ -334,22 +303,41 @@ class _EditProfilePageState extends State<EditProfilePage> {
       bottomNavigationBar: BottomAppBar(
         child: ElevatedButton(
           onPressed: () async {
+            if (_firstNameController.text.isEmpty ||
+                _lastNameController.text.isEmpty ||
+                _phoneController.text.isEmpty ||
+                selectedCountry.isEmpty) {
+              showFlushbar(context, 'Please fill in all fields', Colors.red);
+              return;
+            }
+
+            if (!RegExp(r'^\d+$').hasMatch(_phoneController.text)) {
+              showFlushbar(
+                  context, 'Phone number must contain only digits', Colors.red);
+              return;
+            }
+
             try {
+              final fullPhoneNumber =
+                  '(+${selectedCountryCode!})${_phoneController.text}';
+
               await _userService.modifierUserPrenom(
                   widget.id, _firstNameController.text);
               await _userService.modifierUserNom(
                   widget.id, _lastNameController.text);
-              await _userService.modifierUserPhone(
-                  widget.id, _phoneController.text);
+              await _userService.modifierUserPhone(widget.id, fullPhoneNumber);
               await _userService.modifierUserPays(widget.id, selectedCountry);
-              UserData user = new UserData(
-                  firstName: _firstNameController.text,
-                  lastName: _lastNameController.text,
-                  phone: _phoneController.text,
-                  country: selectedCountry);
+              await _userService.modifierUserFlag(widget.id, flagEmoji!);
+              UserData user = UserData(
+                firstName: _firstNameController.text,
+                lastName: _lastNameController.text,
+                phone: _phoneController.text,
+                country: selectedCountry,
+              );
               Navigator.pop(context, user);
             } catch (e) {
-              print('Erreur lors de la modification du nom: $e');
+              showFlushbar(context,
+                  'Error occurred while updating information: $e', Colors.red);
             }
           },
           child: Text(

@@ -2,12 +2,12 @@ import 'dart:convert';
 import 'package:casavia/model/reservation.dart';
 import 'package:http/http.dart' as http;
 
-
 class ReservationService {
+  final String baseUrl = 'http://192.168.1.17:3000/reservation';
   Future<Reservation?> ajouterReservation(
-      Reservation reservation, int userId, int hebergementId) async {
+      Reservation reservation, int user_id, int hebergement_id) async {
     String url =
-        'http://192.168.1.17:3000/reservation/save?user=$userId&hebergement=$hebergementId';
+        'http://192.168.1.17:3000/reservation/save?user_id=$user_id&hebergement_id=$hebergement_id';
 
     try {
       String reservationJson = jsonEncode(reservation.toJson());
@@ -62,16 +62,12 @@ class ReservationService {
   }
 
   Future<Reservation?> getById(int? id) async {
-    // Construire l'URL pour obtenir la réservation par son ID
     String url = 'http://192.168.1.17:3000/reservation/getById/$id';
 
     try {
-      // Effectuer une requête HTTP GET pour obtenir la réservation
       final response = await http.get(Uri.parse(url));
 
-      // Vérifier la réponse du serveur
       if (response.statusCode == 200) {
-        // Convertir la réponse JSON en objet Reservation
         Reservation reservation =
             Reservation.fromJson(jsonDecode(response.body));
         return reservation;
@@ -84,6 +80,54 @@ class ReservationService {
     } catch (e) {
       print('Erreur lors de la requête : $e');
       return null;
+    }
+  }
+
+  Future<List<Reservation>> getPendingOrConfirmedReservationsByUser(
+      int userId) async {
+    final response =
+        await http.get(Uri.parse('$baseUrl/user/pendingOrConfirmed/$userId'));
+
+    if (response.statusCode == 200) {
+      List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => Reservation.fromJson(json)).toList();
+    } else {
+      throw Exception('Failed to load reservations');
+    }
+  }
+
+  Future<List<Reservation>> getCompletedReservationsByUser(int userId) async {
+    final response =
+        await http.get(Uri.parse('$baseUrl/user/completed/$userId'));
+
+    if (response.statusCode == 200) {
+      List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => Reservation.fromJson(json)).toList();
+    } else {
+      throw Exception('Failed to load reservations');
+    }
+  }
+  Future<void> annulerReservation(int id) async {
+    final url = Uri.parse('$baseUrl/annuler/$id');
+    final response = await http.put(url);
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to cancel reservation');
+    }
+  }
+
+  Future<Reservation> updateReservation(int id, Reservation updatedReservation) async {
+    final url = Uri.parse('$baseUrl/updated/$id');
+    final response = await http.put(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(updatedReservation.toJson()),
+    );
+
+    if (response.statusCode == 200) {
+      return Reservation.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to update reservation');
     }
   }
 }

@@ -22,6 +22,19 @@ class LikeService {
       throw Exception('Failed to load likes for user: $e');
     }
   }
+   Future<List<Like>> getLikesByUserAndCurrency(int userId, String currency) async {
+    final url = Uri.parse('$baseUrl/getByUser/currency/$userId?currency=$currency');
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      List<dynamic> data = json.decode(response.body);
+      return data.map((item) => Like.fromJson(item)).toList();
+    } else {
+      throw Exception('Failed to load likes');
+    }
+  }
+
+
 
   Future<Like> addLike(int userId, int hebergementId) async {
     final uri = Uri.parse('$baseUrl/save').replace(queryParameters: {

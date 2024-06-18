@@ -2,7 +2,7 @@ name: casavia
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.3.3 <4.0.0'
+  sdk: ">=3.3.3 <4.0.0"
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -31,19 +31,18 @@ dependencies:
   flutter:
     sdk: flutter
 
-
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.6
   lottie: ^3.1.0
   font_awesome_flutter: ^10.7.0
- 
+
   country_list_pick: ^1.0.1+6
   country_list_with_dial_code_and_flag: ^1.0.0
   country_picker: ^2.0.25
   country_icons: 3.0.0
-  http: ^1.2.1
-  shared_preferences: ^2.2.3 
+  http: ^0.13.5
+  shared_preferences: ^2.2.3
   flutter_map: ^6.1.0
   latlong2: ^0.9.1
   url_launcher: ^6.2.6
@@ -53,17 +52,27 @@ dependencies:
   country_flags: ^2.2.0
   video_player: ^2.8.6
   path_provider: ^2.1.3
- 
+
   flutter_dotenv: ^5.1.0
   apple_maps_flutter: ^1.3.0
   flutter_typeahead: ^5.2.0
   expandable: ^5.0.1
   currency_picker: ^2.0.21
- 
+  table_calendar: ^3.0.0
+  another_flushbar: ^1.10.25
+  share_plus: ^9.0.0
+  device_apps: ^2.2.0
+  flutter_xlider: ^3.5.0
+  dio: ^4.0.6
+  timeago: ^3.6.1
+  pusher_channels_flutter: ^2.2.1
+  flutter_paypal_checkout: any
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+dependency_overrides:
+  http: ^0.13.5
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -147,6 +156,17 @@ flutter:
     - assets/code.svg
     - assets/icons/edit.svg
     - assets/favorite.svg
+    - assets/search.jpg
+    - assets/payementPaypal.png
+    - assets/payementFlouci.png
+    - assets/notification.png
+    - assets/reviews.svg
+    - assets/favoris.svg
+    - assets/conversation.svg
+    - assets/notification.svg
+    - assets/reservation.svg
+    - assets/paypalMethod.png
+    - assets/paypal.svg
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware
 

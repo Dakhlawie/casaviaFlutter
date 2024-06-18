@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'package:casavia/model/DBSCANClustering%20.dart';
+import 'package:casavia/model/HierarchicalAgglomerativeClustering.dart';
 import 'package:casavia/model/KMeansClustering.dart';
 import 'package:casavia/model/recommandation.dart';
 import 'package:http/http.dart' as http;
 import 'package:casavia/model/hebergement.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class RecommandationService {
   Future<List<Hebergement>> fetchHebergements() async {
@@ -86,6 +89,18 @@ class RecommandationService {
     }
   }
 
+  Future<Hebergement> fetchHebergementFromRecommandationByCurrency(
+      int recommandationId, String targetCurrency) async {
+    final response = await http.get(Uri.parse(
+        'http://192.168.1.17:3000/hebergement/from-recommandationByCurrency/$recommandationId?targetCurrency=$targetCurrency'));
+
+    if (response.statusCode == 200) {
+      return Hebergement.fromJson(json.decode(response.body));
+    } else {
+      throw Exception('Failed to load hebergement');
+    }
+  }
+
   Future<Hebergement> getHebergementFromRecommandation(
       int? recommandationId) async {
     final response = await http.get(Uri.parse(
@@ -140,16 +155,25 @@ class RecommandationService {
   Future<List<Hebergement>> getRecommendedHebergementsByUser(int userId) async {
     print('hi');
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final storedCurrency = prefs.getString('selectedCurrency');
+
       List<Recommandation> recommandations =
           await fetchRecommandationsByUser(userId);
-
       List<Hebergement> hebergements = [];
 
       for (Recommandation recommandation in recommandations) {
-        Hebergement hebergement = await getHebergementFromRecommandation(
-            recommandation.recommandation_id);
+        Hebergement hebergement;
+        if (storedCurrency != null) {
+          hebergement = await fetchHebergementFromRecommandationByCurrency(
+              recommandation.recommandation_id!, storedCurrency);
+        } else {
+          hebergement = await getHebergementFromRecommandation(
+              recommandation.recommandation_id);
+        }
         hebergements.add(hebergement);
       }
+
       print('********************************');
       print(hebergements);
       return hebergements;
@@ -181,7 +205,7 @@ class RecommandationService {
     List<int> selectedClusters = selectedHebergements
         .map((hebergement) => kmeans.predict(hebergement))
         .toList();
-
+    print('Number of K-Means Clusters: ${selectedClusters.toSet().length}');
     for (int clusterId in selectedClusters.toSet()) {
       List<Hebergement> clusterHebergements = kmeans.getCluster(clusterId);
 
@@ -192,8 +216,163 @@ class RecommandationService {
                 hebergement.nbEtoile == selectedHebergement.nbEtoile &&
                 hebergement.nbChambres == selectedHebergement.nbChambres &&
                 hebergement.nbSallesDeBains ==
-                    selectedHebergement.nbSallesDeBains)
+                    selectedHebergement.nbSallesDeBains &&
+                hebergement.politiqueAnnulation ==
+                    selectedHebergement.politiqueAnnulation &&
+                hebergement.categorie.idCat ==
+                    selectedHebergement.categorie.idCat)
             .toList();
+
+        print('verification');
+        print(
+            "Selected IDs: ${selectedHebergements.map((h) => h.hebergementId).toList()}");
+        print(
+            "Matching IDs: ${allHebergements.map((h) => h.hebergementId).toList()}");
+
+        for (Hebergement matchingHebergement in filteredHebergements) {
+          print(matchingHebergement.nom);
+          bool isAlreadySelected = selectedHebergements.any((selected) =>
+              selected.hebergementId == matchingHebergement.hebergementId);
+          if (!isAlreadySelected &&
+              !alreadyRecommendedIds
+                  .contains(matchingHebergement.hebergementId)) {
+            addRecommandation(
+                Recommandation(), userId, matchingHebergement.hebergementId);
+            recommendedHebergements.add(matchingHebergement);
+          }
+        }
+      }
+    }
+
+    recommendedHebergements = recommendedHebergements
+        .where((hebergement) => !selectedHebergements.contains(hebergement))
+        .toList();
+
+    return recommendedHebergements;
+  }
+
+  Future<List<Hebergement>> getRecommendedHebergementsHAC(
+      List<Hebergement> selectedHebergements, int userId) async {
+    final allHebergements = await fetchHebergements();
+    Set<int> alreadyRecommendedIds =
+        await fetchAlreadyRecommendedHebergementIds(userId);
+
+    List<Hebergement> recommendedHebergements = [];
+
+    final List<Hebergement> hebergementsToCluster = allHebergements
+        .where((hebergement) => !selectedHebergements.contains(hebergement))
+        .toList();
+
+    HierarchicalAgglomerativeClustering hac =
+        HierarchicalAgglomerativeClustering(
+      data: hebergementsToCluster,
+      k: 5,
+    );
+
+    hac.run();
+
+    List<int> selectedClusters = selectedHebergements
+        .map((hebergement) => hac.predict(hebergement))
+        .toList();
+
+    print('Number of HAC Clusters: ${selectedClusters.toSet().length}');
+    for (int clusterId in selectedClusters.toSet()) {
+      List<Hebergement> clusterHebergements = hac.getCluster(clusterId);
+
+      for (Hebergement selectedHebergement in selectedHebergements) {
+        List<Hebergement> filteredHebergements = clusterHebergements
+            .where((hebergement) =>
+                hebergement.pays == selectedHebergement.pays &&
+                hebergement.nbEtoile == selectedHebergement.nbEtoile &&
+                hebergement.nbChambres == selectedHebergement.nbChambres &&
+                hebergement.nbSallesDeBains ==
+                    selectedHebergement.nbSallesDeBains &&
+                hebergement.politiqueAnnulation ==
+                    selectedHebergement.politiqueAnnulation &&
+                hebergement.categorie.idCat ==
+                    selectedHebergement.categorie.idCat)
+            .toList();
+
+        print('verification');
+        print(
+            "Selected IDs: ${selectedHebergements.map((h) => h.hebergementId).toList()}");
+        print(
+            "Matching IDs: ${allHebergements.map((h) => h.hebergementId).toList()}");
+
+        for (Hebergement matchingHebergement in filteredHebergements) {
+          print(matchingHebergement.nom);
+          bool isAlreadySelected = selectedHebergements.any((selected) =>
+              selected.hebergementId == matchingHebergement.hebergementId);
+          if (!isAlreadySelected &&
+              !alreadyRecommendedIds
+                  .contains(matchingHebergement.hebergementId)) {
+            addRecommandation(
+                Recommandation(), userId, matchingHebergement.hebergementId);
+            recommendedHebergements.add(matchingHebergement);
+          }
+        }
+      }
+    }
+
+    recommendedHebergements = recommendedHebergements
+        .where((hebergement) => !selectedHebergements.contains(hebergement))
+        .toList();
+
+    return recommendedHebergements;
+  }
+
+  Future<List<Hebergement>> getRecommendedHebergementsDBSCAN(
+      List<Hebergement> selectedHebergements, int userId) async {
+    final allHebergements = await fetchHebergements();
+    Set<int> alreadyRecommendedIds =
+        await fetchAlreadyRecommendedHebergementIds(userId);
+
+    List<Hebergement> recommendedHebergements = [];
+
+    final List<Hebergement> hebergementsToCluster = allHebergements
+        .where((hebergement) => !selectedHebergements.contains(hebergement))
+        .toList();
+
+    DBSCANClustering dbscan = DBSCANClustering(
+      data: hebergementsToCluster,
+      epsilon: 0.5,
+      minPoints: 5,
+    );
+
+    dbscan.run();
+
+    List<int> selectedClusters = selectedHebergements
+        .map((hebergement) => dbscan.predict(hebergement))
+        .toList();
+    print('Number of DBSCAN Clusters: ${selectedClusters.toSet().length}');
+
+    for (int clusterId in selectedClusters.toSet()) {
+      List<Hebergement> clusterHebergements = dbscan.getCluster(clusterId);
+      for (int clusterId in selectedClusters.toSet()) {
+        List<Hebergement> clusterHebergements = dbscan.getCluster(clusterId);
+
+        print('Cluster ID: $clusterId');
+        print(
+            'Number of Hebergements in Cluster: ${clusterHebergements.length}');
+
+        for (Hebergement hebergement in clusterHebergements) {
+          print('Cluster ID: $clusterId, Nom: ${hebergement.nom}');
+        }
+      }
+      for (Hebergement selectedHebergement in selectedHebergements) {
+        List<Hebergement> filteredHebergements = clusterHebergements
+            .where((hebergement) =>
+                hebergement.pays == selectedHebergement.pays &&
+                hebergement.nbEtoile == selectedHebergement.nbEtoile &&
+                hebergement.nbChambres == selectedHebergement.nbChambres &&
+                hebergement.nbSallesDeBains ==
+                    selectedHebergement.nbSallesDeBains &&
+                hebergement.politiqueAnnulation ==
+                    selectedHebergement.politiqueAnnulation &&
+                hebergement.categorie.idCat ==
+                    selectedHebergement.categorie.idCat)
+            .toList();
+
         print('verification');
         print(
             "Selected IDs: ${selectedHebergements.map((h) => h.hebergementId).toList()}");

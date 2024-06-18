@@ -1,5 +1,7 @@
+import 'package:another_flushbar/flushbar.dart';
 import 'package:casavia/Screens/login/forget_password.dart';
 import 'package:casavia/Screens/login/infos.dart';
+import 'package:casavia/Screens/login/signUp.dart';
 
 import 'package:casavia/Screens/login/welcome.dart';
 import 'package:casavia/services/AuthService.dart';
@@ -15,20 +17,6 @@ class LoginPage extends StatefulWidget {
 
   @override
   State<LoginPage> createState() => _LoginPageState();
-  void showSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message,
-            style: TextStyle(
-              color: Colors.white,
-              fontFamily: 'AbrilFatface',
-            )),
-        duration: Duration(seconds: 2),
-        backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
 }
 
 class _LoginPageState extends State<LoginPage> {
@@ -37,6 +25,14 @@ class _LoginPageState extends State<LoginPage> {
   bool _isObscured = true;
   String _emailerror = "";
   String _passerror = "";
+  void showFlushbar(BuildContext context, String message, Color color) {
+    Flushbar(
+      message: message,
+      backgroundColor: color,
+      duration: Duration(seconds: 3),
+      flushbarPosition: FlushbarPosition.TOP,
+    ).show(context);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,64 +67,42 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       SizedBox(height: 30),
                       TextField(
-                        onTap: () {
-                          setState(() {
-                            if (mailController.text.isEmpty) {
-                              _emailerror = "This field cannot be empty";
-                            } else {
-                              _emailerror = "";
-                            }
-                          });
-                        },
-                        onChanged: (value) {
-                          setState(() {
-                            if (mailController.text.isEmpty) {
-                              _emailerror = "This field cannot be empty";
-                            } else {
-                              _emailerror = "";
-                            }
-                          });
-                        },
-                        keyboardType: TextInputType.emailAddress,
                         controller: mailController,
                         decoration: InputDecoration(
-                          labelText: "Enter your Email",
-                          labelStyle: TextStyle(
+                          hintText: 'Enter your email',
+                          hintStyle: TextStyle(
                               fontFamily: 'AbrilFatface', fontSize: 14),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(
-                              color: Colors.blue[900]!,
-                            ),
                           ),
                           prefixIcon: Icon(
                             Icons.email,
                             color: Colors.blue[900],
                           ),
+                          focusedBorder: OutlineInputBorder(
+                            borderSide: BorderSide(
+                                color: Colors.blue[900]!, width: 1.0),
+                            borderRadius:
+                                BorderRadius.all(Radius.circular(10.0)),
+                          ),
                         ),
                       ),
                       SizedBox(height: 10.0),
                       TextField(
-                        keyboardType: TextInputType.visiblePassword,
                         obscureText: _isObscured,
                         controller: passwordController,
                         decoration: InputDecoration(
+                          hintText: 'Enter your password',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
+                          hintStyle: TextStyle(
+                              fontFamily: 'AbrilFatface', fontSize: 14),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
                             borderSide: BorderSide(
-                              color: Colors.blue[900]!,
-                            ),
-                          ),
-                          labelText: "Enter your password",
-                          labelStyle: TextStyle(
-                            fontFamily: 'AbrilFatface',
-                            fontSize: 14,
+                                color: Colors.blue[900]!, width: 1.0),
+                            borderRadius:
+                                BorderRadius.all(Radius.circular(10.0)),
                           ),
                           prefixIcon: Icon(
                             Icons.lock,
@@ -137,9 +111,9 @@ class _LoginPageState extends State<LoginPage> {
                           suffixIcon: IconButton(
                             icon: Icon(
                               _isObscured
-                                  ? Icons.visibility
-                                  : Icons.visibility_off,
-                              color: Colors.blue[900],
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              color: Colors.grey,
                             ),
                             onPressed: () {
                               setState(() {
@@ -196,12 +170,14 @@ class _LoginPageState extends State<LoginPage> {
                                 );
                               } else {
                                 final errorMessage = result['message'];
-                                widget.showSnackBar(
-                                    context, "invalid email or password ");
+                                showFlushbar(context,
+                                    "Invalid email or password.", Colors.red);
                               }
                             } else {
-                              widget.showSnackBar(context,
-                                  "Please enter your email and your password");
+                              showFlushbar(
+                                  context,
+                                  "Please enter your email and your password.",
+                                  Colors.red);
                             }
                           },
                           style: ElevatedButton.styleFrom(
@@ -237,7 +213,7 @@ class _LoginPageState extends State<LoginPage> {
                               Navigator.push(
                                 context,
                                 CupertinoPageRoute(
-                                  builder: (context) => UserInformation(),
+                                  builder: (context) => SignUpPage(),
                                 ),
                               );
                             },

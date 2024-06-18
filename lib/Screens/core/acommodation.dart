@@ -1,12 +1,29 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:core';
+
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:casavia/Screens/core/ReservationEtape2.dart';
+import 'package:casavia/Screens/core/VideoPlayerPage%20.dart';
 import 'package:casavia/Screens/core/comments.dart';
+import 'package:casavia/Screens/core/conversation.dart';
 import 'package:casavia/Screens/core/equipements.dart';
+import 'package:casavia/Screens/core/facilities.dart';
+import 'package:casavia/Screens/core/openstreetMap.dart';
+import 'package:casavia/Screens/core/position.dart';
+import 'package:casavia/Screens/core/reservationEtape1.dart';
+import 'package:casavia/model/conversation.dart';
 import 'package:casavia/model/language.dart';
+import 'package:casavia/model/user.dart';
+import 'package:casavia/services/conversationService.dart';
 import 'package:casavia/services/currencyService.dart';
+import 'package:casavia/widgets/custom_button.dart';
+import 'package:casavia/widgets/custom_text_field.dart';
+import 'package:device_apps/device_apps.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:table_calendar/table_calendar.dart';
 import 'package:video_player/video_player.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
@@ -29,7 +46,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:casavia/Screens/core/map.dart';
+import 'package:casavia/Screens/core/location_map.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -49,76 +66,253 @@ class AcommodationPage extends StatefulWidget {
 }
 
 class _AcommodationPageState extends State<AcommodationPage> {
+  void showSearchDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.calendar_month, color: Colors.blue[900]),
+                    SizedBox(width: 20),
+                    Expanded(
+                      child: CustomTextField(
+                        readOnly: true,
+                        label: 'Check In',
+                        controller: checkInTextController,
+                        onTap: () {
+                          _showCalendarDialog(
+                              context, checkInTextController, true);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Icon(Icons.calendar_month, color: Colors.blue[900]),
+                    SizedBox(width: 20),
+                    Expanded(
+                      child: CustomTextField(
+                        readOnly: true,
+                        label: 'Check Out',
+                        controller: checkOutTextController,
+                        onTap: () {
+                          _showCalendarDialog(
+                              context, checkOutTextController, false);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                CustomButton(
+                  buttonText: 'Apply',
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                )
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   TextEditingController _messageController = TextEditingController();
+  String? ratingText;
   DateTime? _selectedDate;
   final TextEditingController checkInTextController = TextEditingController();
-  bool _isChatOpen = false;
-
   final TextEditingController checkOutTextController = TextEditingController();
-  DateTime? _checkInDate;
-  DateTime? _checkOutDate;
-  Future<void> _selectDate(BuildContext context, bool isCheckIn) async {
-    print("hi");
-    try {
-      final DateTime? picked = await showDatePicker(
-        context: context,
-        initialDate: _selectedDate ?? DateTime.now(),
-        firstDate: DateTime(2000),
-        lastDate: DateTime(2101),
-        builder: (BuildContext context, Widget? child) {
-          return Theme(
-            data: ThemeData.dark().copyWith(
-              colorScheme: ColorScheme.dark(
-                primary: Colors.blue[900]!,
-                onPrimary: Colors.white,
-                surface: Colors.blue[900]!,
-                onSurface: Colors.white,
-              ),
-              textButtonTheme: TextButtonThemeData(
-                style: TextButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    textStyle: TextStyle(color: Colors.white)),
-              ),
-            ),
-            child: child!,
-          );
-        },
-      );
-      print("Date picker closed");
-      print(picked);
-      if (picked != null) {
-        setState(() {
-          final DateFormat formatter = DateFormat('dd/MM/yyyy');
-          String formattedDate = formatter.format(picked);
-
-          if (isCheckIn) {
-            _checkInDate = picked;
-            checkInTextController.text = formattedDate;
-          } else {
-            _checkOutDate = picked;
-            checkOutTextController.text = formattedDate;
-          }
-        });
-      }
-    } catch (e, stackTrace) {
-      print("An error occurred: $e");
-      print("Error picking date: $e");
-      print("StackTrace: $stackTrace");
+  Map<int, bool> showMore = {};
+  Map<int, bool> _isExpandedMap = {};
+  String _getShortText(String text) {
+    if (text.length > 100) {
+      return text.substring(0, 100) + '...';
+    } else {
+      return text;
     }
   }
 
+  bool _isChatOpen = false;
+  List<Avis> _avisList = [];
+  List<Avis> _meilleurAvisList = [];
+  bool _isLoading = true;
+  List<Avis> getMeilleurAvis(List<Avis> avisList) {
+    return avisList.where((avis) {
+      if (avis.moyenne == null) {
+        return false;
+      }
+
+      double? moyenne = double.tryParse(avis.moyenne!);
+      if (moyenne == null) {
+        return false;
+      }
+
+      return moyenne >= 4 &&
+          moyenne <= 5 &&
+          (avis.avisNegative == null || avis.avisNegative!.isEmpty);
+    }).toList();
+  }
+
+  Future<void> _fetchAvis(int hebergementId) async {
+    try {
+      List<Avis> avisList =
+          await _avisService.fetchAvisByHebergement(hebergementId);
+      List<Avis> meilleurAvisList = getMeilleurAvis(avisList);
+
+      avisList.sort((a, b) => b.date.compareTo(a.date));
+      meilleurAvisList.sort((a, b) => b.date.compareTo(a.date));
+
+      setState(() {
+        _avisList = avisList;
+        _meilleurAvisList = meilleurAvisList;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Failed to load avis: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _showShareOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return ShareBottomSheet();
+      },
+    );
+  }
+
+  ConversationService conversationserv = ConversationService();
+
+  double? prix;
+  Map<String, IconData> equipementIcons = {
+    'Pool': FontAwesomeIcons.swimmingPool,
+    'Parking': FontAwesomeIcons.parking,
+    'Air Conditioning': FontAwesomeIcons.snowflake,
+    'Breakfast': FontAwesomeIcons.utensils,
+    'Restaurant': FontAwesomeIcons.conciergeBell,
+    'Wi-Fi': FontAwesomeIcons.wifi,
+  };
+
+  DateTime? _checkInDate;
+  DateTime? _checkOutDate;
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _selectedDay;
+  void _showCalendarDialog(
+      BuildContext context, TextEditingController controller, bool isCheckIn) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.0)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16.0),
+                child: Text(
+                  isCheckIn ? 'Check In' : 'Check Out',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontFamily: 'AbrilFatface',
+                  ),
+                ),
+              ),
+              TableCalendar(
+                firstDay: DateTime(2000),
+                lastDay: DateTime(2100),
+                focusedDay: _focusedDay,
+                selectedDayPredicate: (day) {
+                  return isSameDay(_selectedDay, day);
+                },
+                onDaySelected: (selectedDay, focusedDay) {
+                  setState(() {
+                    _selectedDay = selectedDay;
+                    _focusedDay = focusedDay;
+                    controller.text =
+                        DateFormat('dd/MM/yyyy').format(selectedDay);
+
+                    if (isCheckIn) {
+                      // Logique pour Check In
+                    } else {
+                      // Logique pour Check Out
+                    }
+                  });
+                  Navigator.pop(context);
+                },
+                calendarStyle: CalendarStyle(
+                  todayDecoration: BoxDecoration(
+                    color: Colors.blue[900],
+                    shape: BoxShape.circle,
+                  ),
+                  selectedDecoration: BoxDecoration(
+                    color: Colors.blue[900],
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                headerStyle: HeaderStyle(
+                  formatButtonVisible: false,
+                  titleCentered: true,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0, vertical: 16.0),
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue[900],
+                    foregroundColor: Colors.white,
+                  ),
+                  child: Center(
+                    child: Text('Apply'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   final HebergementService _hebergementService = HebergementService();
-  List<Equipement> equipements = [];
-  _loadEquipements() async {
+  List<Equipement>? equipements = [];
+  List<Equipement>? allEquipements = [];
+  bool isLoading = true;
+  Future<void> _loadEquipements() async {
     try {
       int hebergementId = widget.hebergement.hebergementId;
       var fetchedEquipements =
           await _hebergementService.getEquipements(hebergementId);
       setState(() {
+        allEquipements = fetchedEquipements;
         equipements = fetchedEquipements.take(4).toList();
+        isLoading = false;
       });
     } catch (e) {
       print('Failed to load equipements: $e');
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
@@ -137,17 +331,20 @@ class _AcommodationPageState extends State<AcommodationPage> {
     _loadEquipements();
     checkInTextController.text = widget.checkIn;
     checkOutTextController.text = widget.checkOut;
-    _avisFuture = _avisService.fetchAvis();
+    _avisFuture =
+        _avisService.fetchAvisByHebergement(widget.hebergement.hebergementId);
     _timer = Timer.periodic(Duration(seconds: 5), (Timer timer) {
       setState(() {
         _selectedImageIndex =
             (_selectedImageIndex + 1) % widget.hebergement.images.length;
       });
     });
-
+    _fetchAvis(widget.hebergement.hebergementId);
     _fetchUserId();
     _loadVideo();
     fetchLanguages();
+
+    calculateAndSetPrice();
     didChangeDependencies();
   }
 
@@ -169,37 +366,85 @@ class _AcommodationPageState extends State<AcommodationPage> {
     }
   }
 
+  User? user;
   Future<void> _fetchUserId() async {
     AuthService authService = AuthService();
     int? userId = await authService.getUserIdFromToken();
     if (userId != null) {
       Provider.of<UserModel>(context, listen: false).setUserId(userId);
+      user = await UserService().getUserById(userId);
     }
     print('USERID');
     print(userId);
   }
 
+  int? numberOfNights;
   String? symbol;
   double? convertedPrice;
-  Future<double> calculatePrice(
-      String checkIn, String checkOut, double prixParNuit) async {
+  late double? discountedPrice;
+  late bool hasOffers = false;
+  double calculatePrice(String checkIn, String checkOut, double prixParNuit) {
     DateTime startDate = DateFormat('dd/MM/yyyy').parse(checkIn);
     DateTime endDate = DateFormat('dd/MM/yyyy').parse(checkOut);
-    int numberOfNights = endDate.difference(startDate).inDays;
-    double totalPrice = numberOfNights * prixParNuit;
+    numberOfNights = endDate.difference(startDate).inDays;
+    return numberOfNights! * prixParNuit;
+  }
 
-    final prefs = await SharedPreferences.getInstance();
-    String? ToCurrency = prefs.getString('selectedCurrency');
-    if (ToCurrency != null) {
-      symbol = getCurrencySymbol(ToCurrency);
+  String getNightsText() {
+    if (numberOfNights == null) {
+      return '';
+    } else if (numberOfNights == 1) {
+      return 'per night';
+    } else {
+      return 'per $numberOfNights nights';
     }
-    if (ToCurrency != null && ToCurrency!.isNotEmpty) {
-      double rate = await CurrencyService()
-          .getConversionRate(widget.hebergement.currency, ToCurrency);
-      totalPrice *= rate;
-    }
+  }
 
-    return totalPrice;
+  void calculateAndSetPrice() {
+    prix = calculatePrice(
+        widget.checkIn, widget.checkOut, widget.hebergement.prix);
+    hasOffers = widget.hebergement.offres != null &&
+        widget.hebergement.offres!.isNotEmpty;
+    discountedPrice = hasOffers
+        ? prix! -
+            (prix! *
+                (double.parse(widget.hebergement.offres![0].discount) / 100))
+        : prix;
+    setState(() {});
+  }
+  // Future<double> calculatePrice(
+  //     String checkIn, String checkOut, double prixParNuit) async {
+  //   DateTime startDate = DateFormat('dd/MM/yyyy').parse(checkIn);
+  //   DateTime endDate = DateFormat('dd/MM/yyyy').parse(checkOut);
+  //   numberOfNights = endDate.difference(startDate).inDays;
+  //   double totalPrice = numberOfNights! * prixParNuit;
+
+  //   final prefs = await SharedPreferences.getInstance();
+  //   String? ToCurrency = prefs.getString('selectedCurrency');
+  //   if (ToCurrency != null) {
+  //     symbol = getCurrencySymbol(ToCurrency);
+  //   }
+  //   /* if (ToCurrency != null && ToCurrency!.isNotEmpty) {
+  //     double rate = await CurrencyService()
+  //         .getConversionRate(widget.hebergement.currency, ToCurrency);
+  //     totalPrice *= rate;
+  //   }*/
+
+  //   return totalPrice;
+  // }
+
+  String getRatingText(double rating) {
+    if (rating >= 5) {
+      return "Excellent";
+    } else if (rating >= 4) {
+      return "Very Good";
+    } else if (rating >= 3) {
+      return "Good";
+    } else if (rating >= 2) {
+      return "Fair";
+    } else {
+      return "Poor";
+    }
   }
 
   String getCurrencySymbol(String currency) {
@@ -324,39 +569,66 @@ class _AcommodationPageState extends State<AcommodationPage> {
         VideoPlayerController.file(tempVideoFile);
 
     await controller.initialize();
-    controller.addListener(() {
-      if (controller.value.position == controller.value.duration) {
-        Navigator.of(context).pop();
-        controller.dispose();
-      }
-    });
 
-    showDialog(
-      context: context,
-      builder: (context) {
-        return Dialog(
-          backgroundColor: Colors.black,
-          insetPadding:
-              EdgeInsets.only(top: 10, bottom: 10, left: 10, right: 10),
-          child: AspectRatio(
-            aspectRatio: controller.value.aspectRatio,
-            child: VideoPlayer(controller),
-          ),
-        );
-      },
-    );
-
-    controller.play();
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (context) => VideoPlayerPage(controller: controller),
+    ));
   }
 
   Widget build(BuildContext context) {
+    String cancellationPolicy;
+
+    if (widget.hebergement.politiqueAnnulation == 'free cancellation') {
+      cancellationPolicy = 'Free Cancellation';
+    } else if (widget.hebergement.politiqueAnnulation == 'non refundable') {
+      cancellationPolicy = 'Non Refundable';
+    } else {
+      cancellationPolicy =
+          'our cancellation policy requires ${widget.hebergement.politiqueAnnulation} hours,  If you cancel your booking less than ${widget.hebergement.politiqueAnnulation} hours before the scheduled arrival time, cancellation fees may apply.';
+    }
+
     final String phoneNumberWithCode =
         "+ ${widget.hebergement.country_code} ${widget.hebergement.phone}";
     final userId = Provider.of<UserModel>(context).userId;
+    Future<void> handleConversation() async {
+      try {
+        if (widget.hebergement.person == null ||
+            widget.hebergement.person.personId == null) {
+          throw Exception('Partner information is missing.');
+        }
+
+        bool exists = await conversationserv.checkConversationExists(
+            userId, widget.hebergement.person.personId!);
+
+        Conversation conversation;
+        if (exists) {
+          conversation = await conversationserv.findByUserAndPartner(
+              userId, widget.hebergement.person.personId!);
+        } else {
+          print("hello");
+          Conversation newConversation = new Conversation();
+          print("hello**********************");
+          print(widget.hebergement.person.personId!);
+          print(userId);
+          conversation = await conversationserv.addConversation(
+              newConversation, userId, widget.hebergement.person.personId!);
+        }
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ConversationPage(conversation: conversation),
+          ),
+        );
+      } catch (error) {
+        print('Error: $error');
+      }
+    }
+
     print("**********");
     print(userId);
-    var imageList = widget.hebergement.images;
-    var currentImage = imageList[_selectedImageIndex];
+    // var imageList = widget.hebergement.images;
+    // var currentImage = imageList[_selectedImageIndex];
     var images = widget.hebergement.images ?? [];
     description = widget.hebergement.description;
     trimmedDescription = description.substring(0, maxLength);
@@ -373,7 +645,6 @@ class _AcommodationPageState extends State<AcommodationPage> {
           height: double.maxFinite,
           child: Stack(
             children: [
-              
               Positioned(
                 left: 0,
                 right: 0,
@@ -437,11 +708,10 @@ class _AcommodationPageState extends State<AcommodationPage> {
                   ),
                 ),
               ),
-              Visibility(
-                visible: _video != null,
-                child: Positioned(
+              if (_video != null)
+                Positioned(
                   top: 20,
-                  right: 20,
+                  right: 120,
                   child: Container(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
@@ -455,6 +725,39 @@ class _AcommodationPageState extends State<AcommodationPage> {
                         FontAwesomeIcons.video,
                         color: Colors.black,
                       ),
+                    ),
+                  ),
+                ),
+              Positioned(
+                top: 20,
+                right: 20,
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.grey[300],
+                  ),
+                  child: IconButton(
+                    onPressed: () => _showShareOptions(context),
+                    icon: Icon(
+                      FontAwesomeIcons.share,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 20,
+                right: 70,
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.grey[300],
+                  ),
+                  child: IconButton(
+                    onPressed: () => showSearchDialog(context),
+                    icon: Icon(
+                      FontAwesomeIcons.pencil,
+                      color: Colors.black,
                     ),
                   ),
                 ),
@@ -493,29 +796,40 @@ class _AcommodationPageState extends State<AcommodationPage> {
                                     widget.hebergement.categorie.idCat != 1,
                                 child: Padding(
                                   padding: EdgeInsets.only(left: 5),
-                                  child: FutureBuilder<double>(
-                                    future: calculatePrice(
-                                        widget.checkIn,
-                                        widget.checkOut,
-                                        widget.hebergement.prix),
-                                    builder: (context, snapshot) {
-                                      if (snapshot.connectionState ==
-                                          ConnectionState.waiting) {
-                                        return CircularProgressIndicator();
-                                      } else if (snapshot.hasError) {
-                                        return Text(
-                                            "Error: ${snapshot.error.toString()}");
-                                      } else if (snapshot.hasData) {
-                                        return Text(
-                                          "${snapshot.data!.toStringAsFixed(2)}  ${symbol ?? getCurrencySymbol(widget.hebergement.currency)}",
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        '${prix!.toStringAsFixed(2)} ${getCurrencySymbol(widget.hebergement.currency)}',
+                                        style: TextStyle(
+                                          decoration: hasOffers
+                                              ? TextDecoration.lineThrough
+                                              : TextDecoration.none,
+                                          color: hasOffers
+                                              ? Colors.grey
+                                              : Colors.black,
+                                          fontSize: hasOffers ? 16 : 20,
+                                          fontWeight: hasOffers
+                                              ? FontWeight.normal
+                                              : FontWeight.bold,
+                                        ),
+                                      ),
+                                      if (hasOffers)
+                                        Text(
+                                          '${discountedPrice!.toStringAsFixed(2)} ${getCurrencySymbol(widget.hebergement.currency)}',
                                           style: TextStyle(
-                                              color: Colors.black,
-                                              fontSize: 20),
-                                        );
-                                      } else {
-                                        return Text("Price not available");
-                                      }
-                                    },
+                                            color: Colors.red,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 20,
+                                          ),
+                                        ),
+                                      Text(
+                                        '/${getNightsText()}',
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
@@ -622,57 +936,6 @@ class _AcommodationPageState extends State<AcommodationPage> {
                                 '${widget.hebergement.nbChambres} bedrooms, ${widget.hebergement.nbSallesDeBains} bathrooms',
                                 style: TextStyle(color: Colors.grey),
                               )),
-                          SizedBox(height: 10),
-                          Divider(
-                            color: Colors.grey,
-                            thickness: 1,
-                            height: 20,
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: <Widget>[
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Text(
-                                    'Check In',
-                                    style: TextStyle(
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                  InkWell(
-                                    onTap: () => _selectDate(context, true),
-                                    child: Text(checkInTextController.text),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(width: 50),
-                              Container(
-                                height: 40,
-                                child: VerticalDivider(
-                                  width: 20,
-                                  thickness: 1,
-                                  color: Colors.grey[400],
-                                ),
-                              ),
-                              SizedBox(width: 50),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Text(
-                                    'Check Out',
-                                    style: TextStyle(
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                  InkWell(
-                                    onTap: () => _selectDate(context, false),
-                                    child: Text(checkOutTextController.text),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
                           SizedBox(height: 40),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -690,8 +953,8 @@ class _AcommodationPageState extends State<AcommodationPage> {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => EquipementsPage(
-                                          id: widget.hebergement.hebergementId),
+                                      builder: (context) => EquipementList(
+                                          listAvis: allEquipements!),
                                     ),
                                   );
                                 },
@@ -714,51 +977,76 @@ class _AcommodationPageState extends State<AcommodationPage> {
                             ],
                           ),
                           SizedBox(height: 10),
-                          Wrap(
-                            spacing: 100,
-                            runSpacing: 30,
-                            children: equipements.map((equipement) {
-                              return Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(FontAwesomeIcons.check,
-                                      color: Colors.blue[900]),
-                                  SizedBox(width: 5),
-                                  Text(
-                                    equipement.nom,
-                                    style: TextStyle(color: Colors.black),
-                                  ),
-                                ],
-                              );
-                            }).toList(),
-                          ),
+                          isLoading
+                              ? Center(child: CircularProgressIndicator())
+                              : Wrap(
+                                  spacing: 100,
+                                  runSpacing: 30,
+                                  children: equipements!.map((equipement) {
+                                    return Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(FontAwesomeIcons.check,
+                                            color: Colors.blue[900]),
+                                        SizedBox(width: 5),
+                                        Text(
+                                          equipement.nom,
+                                          style: TextStyle(color: Colors.black),
+                                        ),
+                                      ],
+                                    );
+                                  }).toList(),
+                                ),
                           SizedBox(height: 30),
                           Visibility(
-                            visible: widget.hebergement.categorie.idCat == 1,
+                            visible: widget.hebergement.nbAvis != 0,
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
-                                  mainAxisSize: MainAxisSize.min,
+                                  mainAxisAlignment: MainAxisAlignment.start,
                                   children: [
-                                    Text("8.1",
+                                    Text(
+                                        widget.hebergement.moyenne!
+                                                .toStringAsFixed(1) ??
+                                            '',
                                         style: TextStyle(
-                                            fontSize: 20,
+                                            fontSize: 40,
                                             fontWeight: FontWeight.bold,
                                             color: Colors.blue[900])),
                                     SizedBox(width: 8),
-                                    Text("Very Good",
+                                    Text(
+                                        getRatingText(
+                                                widget.hebergement.moyenne!) ??
+                                            '',
                                         style: TextStyle(
                                           fontSize: 20,
                                           fontFamily: 'AbrilFatface',
                                         )),
                                   ],
                                 ),
-                                RatingBar(title: "Cleanliness", rating: 8.5),
-                                RatingBar(title: "Comfort", rating: 8.3),
-                                RatingBar(title: "Facilities", rating: 7.7),
-                                RatingBar(title: "Location", rating: 9.5),
-                                RatingBar(title: "Staff", rating: 9.1),
+                                RatingBar(
+                                    title: widget.hebergement.staff != 0
+                                        ? "Staff"
+                                        : "Security",
+                                    rating: widget.hebergement.staff! ??
+                                        widget.hebergement.security!,
+                                    color: Colors.orange[900]!),
+                                RatingBar(
+                                    title: "Comfort",
+                                    rating: widget.hebergement.comfort!,
+                                    color: Colors.green[900]!),
+                                RatingBar(
+                                    title: "Facilities",
+                                    rating: widget.hebergement.facilities!,
+                                    color: Colors.red[900]!),
+                                RatingBar(
+                                    title: "Location",
+                                    rating: widget.hebergement.location!,
+                                    color: Colors.purple[900]!),
+                                RatingBar(
+                                    title: "Cleanliness",
+                                    rating: widget.hebergement.cleanliness!,
+                                    color: Colors.blue[900]!),
                               ],
                             ),
                           ),
@@ -772,45 +1060,8 @@ class _AcommodationPageState extends State<AcommodationPage> {
                             ),
                           ),
                           SizedBox(height: 5),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Expanded(
-                                child: RichText(
-                                  text: TextSpan(
-                                    children: [
-                                      TextSpan(
-                                        text: displayText,
-                                        style: TextStyle(
-                                          color: Colors.grey,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                      if (description.length > maxLength)
-                                        WidgetSpan(
-                                          child: GestureDetector(
-                                            onTap: () {
-                                              setState(() {
-                                                isExpanded = !isExpanded;
-                                              });
-                                            },
-                                            child: Text(
-                                              isExpanded
-                                                  ? 'show less'
-                                                  : 'show more',
-                                              style: TextStyle(
-                                                color: Colors.blue[900],
-                                                fontSize: 16,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                          ExpandableTextWidget(
+                              text: widget.hebergement.description ?? ''),
                           SizedBox(height: 20),
                           Visibility(
                             visible: widget.hebergement.categorie.idCat == 1,
@@ -823,7 +1074,7 @@ class _AcommodationPageState extends State<AcommodationPage> {
                               ),
                             ),
                           ),
-                          SizedBox(height: 8),
+                          SizedBox(height: 15),
                           Visibility(
                             visible: widget.hebergement.categorie.idCat == 1,
                             child: Wrap(
@@ -847,377 +1098,321 @@ class _AcommodationPageState extends State<AcommodationPage> {
                           ),
                           SizedBox(height: 20),
                           Text(
-                            'What guests loved the most :',
+                            'Cancellation Policy',
                             style: TextStyle(
                               color: Colors.black,
                               fontSize: 20,
                               fontFamily: 'AbrilFatface',
                             ),
                           ),
+                          SizedBox(height: 5),
+                          Text(
+                            cancellationPolicy,
+                            style: TextStyle(color: Colors.grey),
+                          ),
                           SizedBox(height: 20),
-                          Padding(
-                            padding: const EdgeInsets.only(left: 2),
-                            child: FutureBuilder<List<Avis>>(
-                              future: _avisFuture,
-                              builder: (context, snapshot) {
-                                if (snapshot.connectionState ==
-                                    ConnectionState.waiting) {
-                                  return Center(
-                                      child: CircularProgressIndicator());
-                                } else if (snapshot.hasError) {
-                                  return Center(
-                                      child: Text('Erreur: ${snapshot.error}'));
-                                } else {
-                                  return ListView.builder(
-                                    shrinkWrap: true,
-                                    physics: NeverScrollableScrollPhysics(),
-                                    itemCount: snapshot.data!.take(4).length,
-                                    itemBuilder: (context, index) {
-                                      final Avis avis = snapshot.data![index];
+                          Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Reviews',
+                                  style: TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 20,
+                                    fontFamily: 'AbrilFatface',
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => AvisList(
+                                          listAvis: _avisList,
+                                          checkIn: checkInTextController.text,
+                                          checkOut: checkOutTextController.text,
+                                          hebergement: widget.hebergement,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  child: Row(
+                                    children: [
+                                      Text(
+                                        'See all reviews',
+                                        style: TextStyle(
+                                          color: Colors.blue[900],
+                                          fontSize: 14,
+                                          fontFamily: 'AbrilFatface',
+                                        ),
+                                      ),
+                                      SizedBox(width: 4),
+                                      Icon(Icons.arrow_forward_ios_outlined,
+                                          color: Colors.blue[900], size: 14),
+                                    ],
+                                  ),
+                                ),
+                              ]),
+                          SizedBox(height: 20),
+                          ListView.separated(
+                            shrinkWrap: true,
+                            physics: NeverScrollableScrollPhysics(),
+                            itemCount: _meilleurAvisList.length,
+                            separatorBuilder: (context, index) =>
+                                Divider(color: Colors.grey),
+                            itemBuilder: (context, index) {
+                              final Avis avis = _meilleurAvisList[index];
 
-                                      if (avis.hebergement.hebergementId ==
-                                          widget.hebergement.hebergementId) {
-                                        return Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 8.0,
+                              return Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 8.0),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 15),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.only(
+                                      topRight: Radius.circular(15),
+                                      bottomRight: Radius.circular(15),
+                                      topLeft: Radius.circular(15),
+                                      bottomLeft: Radius.circular(15),
+                                    ),
+                                    color: Colors.white,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.grey.withOpacity(0.1),
+                                        spreadRadius: 1,
+                                        blurRadius: 1,
+                                        offset: Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      SizedBox(height: 10),
+                                      Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              FutureBuilder<Uint8List?>(
+                                                future: UserService()
+                                                    .getImageFromFS(
+                                                        avis.user!.id),
+                                                builder:
+                                                    (context, imageSnapshot) {
+                                                  if (imageSnapshot
+                                                          .connectionState ==
+                                                      ConnectionState.waiting) {
+                                                    return CircularProgressIndicator();
+                                                  } else if (imageSnapshot
+                                                      .hasError) {
+                                                    return Text(
+                                                        'Erreur: ${imageSnapshot.error}');
+                                                  } else if (imageSnapshot
+                                                          .hasData &&
+                                                      imageSnapshot.data !=
+                                                          null) {
+                                                    return CircleAvatar(
+                                                      backgroundImage:
+                                                          MemoryImage(
+                                                              imageSnapshot
+                                                                  .data!),
+                                                    );
+                                                  } else {
+                                                    return SizedBox.shrink();
+                                                  }
+                                                },
+                                              ),
+                                              SizedBox(width: 10),
+                                              Column(children: [
+                                                Text(
+                                                  '${avis.user!.nom} ${avis.user!.prenom} ${avis.user!.flag}',
+                                                  style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold),
+                                                ),
+                                                Text('')
+                                              ]),
+                                            ],
                                           ),
-                                          child: Column(children: [
+                                          Text(
+                                            avis.moyenne!,
+                                            style: TextStyle(
+                                                color: Colors.blue[900],
+                                                fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
+                                      SizedBox(height: 5),
+                                      Padding(
+                                        padding: EdgeInsets.only(left: 40),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
                                             Row(
                                               crossAxisAlignment:
                                                   CrossAxisAlignment.start,
                                               children: [
-                                                FutureBuilder<Uint8List?>(
-                                                  future: UserService()
-                                                      .getImageFromFS(
-                                                          avis.user.id),
-                                                  builder:
-                                                      (context, imageSnapshot) {
-                                                    if (imageSnapshot
-                                                            .connectionState ==
-                                                        ConnectionState
-                                                            .waiting) {
-                                                      return CircularProgressIndicator();
-                                                    } else if (imageSnapshot
-                                                        .hasError) {
-                                                      return Text(
-                                                          'Erreur: ${imageSnapshot.error}');
-                                                    } else if (imageSnapshot
-                                                            .hasData &&
-                                                        imageSnapshot.data !=
-                                                            null) {
-                                                      return CircleAvatar(
-                                                        backgroundImage:
-                                                            MemoryImage(
-                                                                imageSnapshot
-                                                                    .data!),
-                                                      );
-                                                    } else {
-                                                      return SizedBox.shrink();
-                                                    }
-                                                  },
+                                                Icon(
+                                                  Icons.sentiment_satisfied,
+                                                  color: Colors.blue[900],
                                                 ),
-                                                SizedBox(width: 10),
-                                                Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      '${avis.user.nom} ${avis.user.prenom}',
-                                                      style: TextStyle(
-                                                          fontWeight:
-                                                              FontWeight.bold),
-                                                    ),
-                                                    SizedBox(width: 5),
-                                                    Text(
-                                                      avis.user.pays ?? '',
-                                                      style: TextStyle(
-                                                          color: Colors.grey),
-                                                    ),
-                                                  ],
+                                                SizedBox(width: 8),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        isExpanded
+                                                            ? avis.avis
+                                                            : _getShortText(
+                                                                avis.avis),
+                                                        style: TextStyle(
+                                                            color: Colors
+                                                                .grey[500]),
+                                                      ),
+                                                      if (!isExpanded &&
+                                                          avis.avis.length >
+                                                              100)
+                                                        GestureDetector(
+                                                          onTap: () {
+                                                            setState(() {
+                                                              _isExpandedMap[
+                                                                  index] = true;
+                                                            });
+                                                          },
+                                                          child: Text(
+                                                            'Show more',
+                                                            style: TextStyle(
+                                                              color: Colors
+                                                                  .blue[900],
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      if (isExpanded)
+                                                        GestureDetector(
+                                                          onTap: () {
+                                                            setState(() {
+                                                              _isExpandedMap[
+                                                                      index] =
+                                                                  false;
+                                                            });
+                                                          },
+                                                          child: Text(
+                                                            'Show less',
+                                                            style: TextStyle(
+                                                              color: Colors
+                                                                  .blue[900],
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                    ],
+                                                  ),
                                                 ),
                                               ],
                                             ),
-                                            SizedBox(height: 5),
-                                            Padding(
-                                              padding:
-                                                  EdgeInsets.only(left: 50),
-                                              child: Text(
-                                                '"${avis.avis}"',
-                                                style: TextStyle(
-                                                    color: Colors.grey),
+                                            if (avis.avisNegative != null)
+                                              SizedBox(height: 4),
+                                            if (avis.avisNegative != null)
+                                              Row(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Icon(
+                                                    Icons
+                                                        .sentiment_dissatisfied,
+                                                    color: Colors.blue[900],
+                                                  ),
+                                                  SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text(
+                                                          isExpanded
+                                                              ? avis
+                                                                  .avisNegative!
+                                                              : _getShortText(avis
+                                                                  .avisNegative!),
+                                                          style: TextStyle(
+                                                              color: Colors
+                                                                  .grey[500]),
+                                                        ),
+                                                        if (!isExpanded &&
+                                                            avis.avisNegative!
+                                                                    .length >
+                                                                100)
+                                                          GestureDetector(
+                                                            onTap: () {
+                                                              setState(() {
+                                                                _isExpandedMap[
+                                                                        index] =
+                                                                    true;
+                                                              });
+                                                            },
+                                                            child: Text(
+                                                              'Show more',
+                                                              style: TextStyle(
+                                                                color: Colors
+                                                                    .blue[900],
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        if (isExpanded)
+                                                          GestureDetector(
+                                                            onTap: () {
+                                                              setState(() {
+                                                                _isExpandedMap[
+                                                                        index] =
+                                                                    false;
+                                                              });
+                                                            },
+                                                            child: Text(
+                                                              'Show less',
+                                                              style: TextStyle(
+                                                                color: Colors
+                                                                    .blue[900],
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
-                                            ),
-                                            SizedBox(height: 5),
-                                            Padding(
-                                              padding: EdgeInsets.only(
-                                                  left: 50, right: 20),
-                                              child: Divider(
-                                                color: Colors.black,
-                                                thickness: 1,
-                                              ),
-                                            ),
-                                          ]),
-                                        );
-                                      } else {
-                                        return SizedBox.shrink();
-                                      }
-                                    },
-                                  );
-                                }
-                              },
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => AvisList(
-                                          hebergement: widget.hebergement,
-                                        )),
+                                          ],
+                                        ),
+                                      ),
+                                      SizedBox(height: 10),
+                                    ],
+                                  ),
+                                ),
                               );
                             },
-                            child: Text('See all reviews',
-                                style: TextStyle(color: Colors.blue[900])),
                           ),
-                          SizedBox(height: 20),
-                          Container(
-                            height: 80,
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(horizontal: 15),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.only(
-                                topRight: Radius.circular(15),
-                                bottomRight: Radius.circular(15),
-                              ),
-                              color: AppColor.cardColor,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColor.shadowColor.withOpacity(0.1),
-                                  spreadRadius: 1,
-                                  blurRadius: 1,
-                                  offset: Offset(0, 1),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(
-                                      left: 1,
-                                    ),
-                                    child: Text(
-                                      'Cancellation Policy',
-                                      style: TextStyle(
-                                          fontFamily: 'AbrilFatface',
-                                          fontSize: 16),
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(
-                                      right: 1,
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      children: [
-                                        IconButton(
-                                          icon: Icon(Icons.arrow_forward_ios),
-                                          onPressed: () {
-                                            showModalBottomSheet(
-                                              context: context,
-                                              builder: (BuildContext context) {
-                                                return Container(
-                                                  padding: EdgeInsets.all(20),
-                                                  child: Column(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      Text(
-                                                        'Cancellation Policy',
-                                                        style: TextStyle(
-                                                            fontWeight:
-                                                                FontWeight.bold,
-                                                            fontSize: 18),
-                                                      ),
-                                                      SizedBox(height: 5),
-                                                      Text(
-                                                        'For cancellations made at least 24 hours before arrival, a full refund is provided. Cancellations within 24 hours of arrival receive a partial refund equivalent to 50% of the total reservation amount. We aim to offer our guests optimal flexibility while maintaining a balanced and transparent approach.',
-                                                        style: TextStyle(
-                                                            fontSize: 16,
-                                                            color: Colors.grey),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                );
-                                              },
-                                            );
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(height: 20),
-                          Container(
-                            height: 80,
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(horizontal: 15),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.only(
-                                topRight: Radius.circular(15),
-                                bottomRight: Radius.circular(15),
-                              ),
-                              color: AppColor.cardColor,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColor.shadowColor.withOpacity(0.1),
-                                  spreadRadius: 1,
-                                  blurRadius: 1,
-                                  offset: Offset(0, 1),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(
-                                      left: 1,
-                                    ),
-                                    child: Text(
-                                      'Contact Information',
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16),
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(
-                                      right: 1,
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      children: [
-                                        IconButton(
-                                          icon: Icon(Icons.arrow_forward_ios),
-                                          onPressed: () {
-                                            showModalBottomSheet(
-                                              context: context,
-                                              builder: (BuildContext context) {
-                                                return Container(
-                                                  width: double.infinity,
-                                                  padding: EdgeInsets.all(20),
-                                                  child: Column(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      Text(
-                                                        'Contact Information',
-                                                        style: TextStyle(
-                                                            fontWeight:
-                                                                FontWeight.bold,
-                                                            fontSize: 18),
-                                                      ),
-                                                      SizedBox(height: 5),
-                                                      Wrap(
-                                                        spacing: 500,
-                                                        runSpacing: 10,
-                                                        children: [
-                                                          if (widget.hebergement
-                                                                  .website !=
-                                                              '') ...[
-                                                            _buildContactInfo(
-                                                              icon: Icons
-                                                                  .language,
-                                                              text: widget
-                                                                  .hebergement
-                                                                  .website!,
-                                                            ),
-                                                          ],
-                                                          if (widget.hebergement
-                                                                  .instagram !=
-                                                              '') ...[
-                                                            _buildContactInfo(
-                                                              icon:
-                                                                  FontAwesomeIcons
-                                                                      .instagram,
-                                                              text: widget
-                                                                  .hebergement
-                                                                  .instagram!,
-                                                            ),
-                                                          ],
-                                                          if (widget.hebergement
-                                                                  .facebook !=
-                                                              '') ...[
-                                                            _buildContactInfo(
-                                                              icon: Icons
-                                                                  .facebook,
-                                                              text: widget
-                                                                  .hebergement
-                                                                  .facebook!,
-                                                            ),
-                                                          ],
-                                                          if (widget.hebergement
-                                                                  .email !=
-                                                              '') ...[
-                                                            _buildContactInfo(
-                                                              icon: Icons.email,
-                                                              text: widget
-                                                                  .hebergement
-                                                                  .email!,
-                                                            ),
-                                                          ],
-                                                          if (widget.hebergement
-                                                                  .phone !=
-                                                              '') ...[
-                                                            _buildContactInfo(
-                                                              icon: Icons.phone,
-                                                              text: widget
-                                                                  .hebergement
-                                                                  .phone!,
-                                                            ),
-                                                          ],
-                                                          if (widget.hebergement
-                                                                  .fax !=
-                                                              '') ...[
-                                                            _buildContactInfo(
-                                                              icon: Icons.print,
-                                                              text: widget
-                                                                  .hebergement
-                                                                  .fax!,
-                                                            ),
-                                                          ],
-                                                        ],
-                                                      ),
-                                                    ],
-                                                  ),
-                                                );
-                                              },
-                                            );
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(height: 300),
+                          SizedBox(height: 100),
                         ],
                       ),
                     ),
@@ -1245,8 +1440,12 @@ class _AcommodationPageState extends State<AcommodationPage> {
                               Navigator.push(
                                 context,
                                 CupertinoPageRoute(
-                                  builder: (context) =>
-                                      Map(hebergement: widget.hebergement),
+                                  builder: (context) => PositionPage(
+                                    hebergement: widget.hebergement,
+                                    rating: ratingText ?? '',
+                                    checkIn: checkInTextController.text,
+                                    checkOut: checkOutTextController.text,
+                                  ),
                                 ),
                               );
                             },
@@ -1283,8 +1482,8 @@ class _AcommodationPageState extends State<AcommodationPage> {
                                     MaterialPageRoute(
                                       builder: (context) => ChambreListPage(
                                         hebergement: widget.hebergement,
-                                        checkIn: widget.checkIn,
-                                        checkOut: widget.checkOut,
+                                        checkIn: checkInTextController.text,
+                                        checkOut: checkOutTextController.text,
                                       ),
                                     ),
                                   );
@@ -1314,7 +1513,37 @@ class _AcommodationPageState extends State<AcommodationPage> {
                                     },
                                   );
                                 }
+                              } else {
+                                if (user == null) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => LoginPage(),
+                                    ),
+                                  );
+                                } else {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          ReservationSecondStep(
+                                        hebergement: widget.hebergement,
+                                        checkIn: widget.checkIn,
+                                        checkOut: widget.checkOut,
+                                        prix: (hasOffers &&
+                                                discountedPrice != null)
+                                            ? discountedPrice!
+                                            : prix!,
+                                        currency: widget.hebergement.currency,
+                                        user: user!,
+                                        nbRooms: 0,
+                                        roomIds: [],
+                                      ),
+                                    ),
+                                  );
+                                }
                               }
+                              ;
                             },
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -1336,27 +1565,23 @@ class _AcommodationPageState extends State<AcommodationPage> {
                         ),
                       ),
                       SizedBox(width: 10),
-                      Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                                color: Color.fromARGB(255, 5, 2, 151)),
-                          ),
-                          child: IconButton(
-                            onPressed: () {
-                             Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => DiscussionPage (
-                                       
-                                      ),
-                                    ),
-                                  );
-                            },
-                            icon: Icon(
-                              FontAwesomeIcons.message,
-                              color: Colors.blue[900],
+                      Visibility(
+                        visible: userId != null && userId != 0,
+                        child: Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                  color: Color.fromARGB(255, 162, 162, 165)),
+                            ),
+                            child: IconButton(
+                              onPressed: () {
+                                handleConversation();
+                              },
+                              icon: Icon(
+                                FontAwesomeIcons.message,
+                                color: Colors.blue[900],
+                              ),
                             ),
                           ),
                         ),
@@ -1528,39 +1753,212 @@ Widget _buildContactInfo(
   );
 }
 
-class RatingBar extends StatelessWidget {
-  final String title;
-  final double rating;
+class ExpandableTextWidget extends StatefulWidget {
+  final String text;
+  const ExpandableTextWidget({Key? key, required this.text}) : super(key: key);
 
-  RatingBar({required this.title, required this.rating});
+  @override
+  _ExpandableTextWidgetState createState() => _ExpandableTextWidgetState();
+}
+
+class _ExpandableTextWidgetState extends State<ExpandableTextWidget> {
+  bool isExpanded = false;
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      title: Text(title),
-      subtitle: Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              isExpanded = !isExpanded;
+            });
+          },
+          child: Text(
+            widget.text,
+            maxLines: isExpanded ? null : 2,
+            overflow: isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+            style: TextStyle(color: Colors.grey, fontSize: 14),
+          ),
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            InkWell(
+              onTap: () {
+                setState(() {
+                  isExpanded = !isExpanded;
+                });
+              },
+              child: Text(
+                isExpanded ? 'show less' : 'show more',
+                style: TextStyle(color: Colors.blue[900], fontSize: 14),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class RatingBar extends StatelessWidget {
+  final String title;
+  final double rating;
+  final Color color;
+
+  RatingBar({required this.title, required this.rating, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    int flexRating = (rating * 10).round();
+    int flexRemaining = (5 * 10 - flexRating);
+
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(
-              flex: (rating * 10).toInt(),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(10.0),
-                child: Container(
-                  height: 5,
-                  color: Colors.blue[900],
-                ),
-              )),
+            flex: 2,
+            child: Text(title, style: TextStyle(fontSize: 16)),
+          ),
           Expanded(
-              flex: 100 - (rating * 10).toInt(),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(10.0),
-                child: Container(
-                  height: 5,
-                  color: Colors.grey[300],
+            flex: 5,
+            child: Row(
+              children: [
+                Expanded(
+                  flex: flexRating,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10.0),
+                    child: Container(
+                      height: 5,
+                      color: color,
+                    ),
+                  ),
                 ),
-              )),
+                Expanded(
+                  flex: flexRemaining,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10.0),
+                    child: Container(
+                      height: 5,
+                      color: Colors.grey[300],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
           Padding(
             padding: EdgeInsets.only(left: 8),
             child: Text(rating.toString(), style: TextStyle(fontSize: 16)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ShareBottomSheet extends StatefulWidget {
+  @override
+  _ShareBottomSheetState createState() => _ShareBottomSheetState();
+}
+
+class _ShareBottomSheetState extends State<ShareBottomSheet> {
+  List<Application> _apps = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadApps();
+  }
+
+  void _loadApps() async {
+    List<Application> apps = await DeviceApps.getInstalledApplications(
+      onlyAppsWithLaunchIntent: true,
+      includeSystemApps: true,
+    );
+    setState(() {
+      _apps = apps;
+    });
+  }
+
+  void _share(BuildContext context, String text) {
+    Share.share(text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 400,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              'Share',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+          ),
+          Expanded(
+            child: GridView.builder(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+              ),
+              itemCount: _apps.length,
+              itemBuilder: (context, index) {
+                Application app = _apps[index];
+                return GestureDetector(
+                  onTap: () => _share(context, 'Check this out!'),
+                  child: Column(
+                    children: [
+                      app is ApplicationWithIcon
+                          ? Image.memory(
+                              app.icon,
+                              width: 40,
+                              height: 40,
+                            )
+                          : Icon(Icons.android),
+                      Text(
+                        app.appName,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 10),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              'Search contacts',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              children: [
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundImage:
+                        NetworkImage('https://example.com/user1.jpg'),
+                  ),
+                  title: Text('Meriem Dakhlawie'),
+                  subtitle: Text('@mdakhlawie'),
+                  trailing: ElevatedButton(
+                    child: Text('Send'),
+                    onPressed: () {},
+                  ),
+                ),
+                // Ajoutez plus de contacts ici
+              ],
+            ),
           ),
         ],
       ),

@@ -35,6 +35,7 @@ class _ProfilePageState extends State<ProfilePage> {
   String phone = '';
   String country = '';
   UserData? data;
+  String? flagemoji;
   @override
   void initState() {
     super.initState();
@@ -139,6 +140,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             lastname: lastname,
                             phone: phone,
                             country: country,
+                            emoji: flagemoji!,
                           )),
                 ).then((result) {
                   if (result != null) {
@@ -343,6 +345,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   } else if (userSnapshot.hasData) {
                     User? user = userSnapshot.data;
                     String email = user?.email ?? '';
+                    flagemoji = user?.flag ?? '';
+
                     return Row(
                       children: [
                         SizedBox(width: 10),

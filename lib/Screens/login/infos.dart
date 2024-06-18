@@ -51,15 +51,15 @@ class _UserInformationState extends State<UserInformation> {
       showSnackBar(
           context, 'This email is already in use. Please try another one.');
     } else {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-            builder: (context) => CodePage(
-                  firstname: firstNameController.text,
-                  lastname: lastNameController.text,
-                  email: emailController.text,
-                )),
-      );
+      // Navigator.push(
+      //   context,
+      //   MaterialPageRoute(
+      //       builder: (context) => CodePage(
+      //             firstname: firstNameController.text,
+      //             lastname: lastNameController.text,
+      //             email: emailController.text,
+      //           )),
+      // );
     }
   }
 

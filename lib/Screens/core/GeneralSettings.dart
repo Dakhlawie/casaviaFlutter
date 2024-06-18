@@ -17,7 +17,7 @@ class _GeneralSettingsState extends State<GeneralSettings> {
     loadSelectedCurrency();
   }
 
-  String selectedCurrency = 'Update your currency';
+  String selectedCurrency = 'Euro';
   void saveSelectedCurrency(Currency currency) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('selectedCurrency', currency.code);

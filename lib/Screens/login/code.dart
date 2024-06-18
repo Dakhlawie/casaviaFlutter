@@ -1,5 +1,6 @@
 import 'package:casavia/Screens/login/correct.dart';
 import 'package:casavia/Screens/login/password.dart';
+import 'package:casavia/Screens/login/passwordSecurity.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
@@ -11,11 +12,17 @@ class CodePage extends StatefulWidget {
   final String firstname;
   final String lastname;
   final String email;
+  final String country;
+  final String tlf;
+  final String codePays;
   const CodePage(
       {super.key,
       required this.firstname,
       required this.lastname,
-      required this.email});
+      required this.email,
+      required this.country,
+      required this.tlf,
+      required this.codePays});
 
   @override
   State<CodePage> createState() => _CodePageState();
@@ -189,10 +196,14 @@ class _CodePageState extends State<CodePage> {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                            builder: (context) => Correct(
+                                            builder: (context) =>
+                                                PasswordSecurity(
                                                   firstname: widget.firstname,
                                                   lastname: widget.lastname,
                                                   email: widget.email,
+                                                  country: widget.country,
+                                                  tlf: widget.tlf,
+                                                  codePays: widget.codePays,
                                                 )),
                                       );
                                     }

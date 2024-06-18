@@ -1,6 +1,7 @@
 import 'package:casavia/Screens/core/accountSettings.dart';
 import 'package:casavia/Screens/core/changePassword.dart';
 import 'package:casavia/Screens/core/deleteAccount.dart';
+import 'package:casavia/Screens/core/updateEmail.dart';
 import 'package:casavia/theme/color.dart';
 import 'package:country_picker/country_picker.dart';
 import 'package:flutter/cupertino.dart';
@@ -358,62 +359,72 @@ class _SecurityPageState extends State<SecurityPage> {
                       ),
                     ),
                   ),
-                ],
-              ),
-            ),
-            SizedBox(height: 20),
-            Container(
-              height: 80,
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 15),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.only(
-                  topRight: Radius.circular(15),
-                  bottomRight: Radius.circular(15),
-                  topLeft: Radius.circular(15),
-                  bottomLeft: Radius.circular(15),
-                ),
-                color: AppColor.cardColor,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColor.shadowColor.withOpacity(0.1),
-                    spreadRadius: 1,
-                    blurRadius: 1,
-                    offset: Offset(0, 1),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(top: 20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Two-factor authentifcation',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            'Add a phone number',
-                            style: TextStyle(fontSize: 14),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                   IconButton(
                     icon: Icon(Icons.arrow_forward_ios),
                     onPressed: () {
-                      _showPhoneEditBottomSheet();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => UpdateMailPage()),
+                      );
                     },
                   ),
                 ],
               ),
             ),
+            // SizedBox(height: 20),
+            // Container(
+            //   height: 80,
+            //   width: double.infinity,
+            //   padding: const EdgeInsets.symmetric(horizontal: 15),
+            //   decoration: BoxDecoration(
+            //     borderRadius: BorderRadius.only(
+            //       topRight: Radius.circular(15),
+            //       bottomRight: Radius.circular(15),
+            //       topLeft: Radius.circular(15),
+            //       bottomLeft: Radius.circular(15),
+            //     ),
+            //     color: AppColor.cardColor,
+            //     boxShadow: [
+            //       BoxShadow(
+            //         color: AppColor.shadowColor.withOpacity(0.1),
+            //         spreadRadius: 1,
+            //         blurRadius: 1,
+            //         offset: Offset(0, 1),
+            //       ),
+            //     ],
+            //   ),
+            //   child: Row(
+            //     children: [
+            //       Expanded(
+            //         child: Padding(
+            //           padding: EdgeInsets.only(top: 20),
+            //           child: Column(
+            //             crossAxisAlignment: CrossAxisAlignment.start,
+            //             children: [
+            //               Text(
+            //                 'Two-factor authentifcation',
+            //                 style: TextStyle(
+            //                   fontWeight: FontWeight.bold,
+            //                 ),
+            //               ),
+            //               Text(
+            //                 'Add a phone number',
+            //                 style: TextStyle(fontSize: 14),
+            //               ),
+            //             ],
+            //           ),
+            //         ),
+            //       ),
+            //       IconButton(
+            //         icon: Icon(Icons.arrow_forward_ios),
+            //         onPressed: () {
+            //           _showPhoneEditBottomSheet();
+            //         },
+            //       ),
+            //     ],
+            //   ),
+            // ),
             SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -3,16 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
-class Map extends StatefulWidget {
+class MapPage extends StatefulWidget {
   final Hebergement hebergement;
 
-  const Map({Key? key, required this.hebergement}) : super(key: key);
+  const MapPage({Key? key, required this.hebergement}) : super(key: key);
 
   @override
-  _MapState createState() => _MapState();
+  _MapPageState createState() => _MapPageState();
 }
 
-class _MapState extends State<Map> {
+class _MapPageState extends State<MapPage> {
   late MapController _mapController;
   late double _zoomLevel;
 
